@@ -1,11 +1,13 @@
-import { ReactNode, useEffect, useRef } from 'react';
+import { Children, createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import { useIsFocused } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import {
-  AccessibilityInfo, Animated, ColorValue, Easing, Pressable, ScrollView, StyleProp, StyleSheet,
+  Animated, ColorValue, Easing, Pressable, ScrollView, StyleProp, StyleSheet,
   Text, TextInput, TextInputProps, View, ViewStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '@/lib/theme';
+import { useReduceMotion } from '@/lib/motion';
 
 const symbolNames = {
   home: { ios: 'house.fill', android: 'home', web: 'home' },
@@ -22,6 +24,8 @@ const symbolNames = {
   check: { ios: 'checkmark', android: 'check', web: 'check' },
 } as const;
 
+const PageFocusContext = createContext(true);
+
 export function Icon({ name, color = theme.text, size = 20 }: { name: keyof typeof symbolNames; color?: ColorValue; size?: number }) {
   return <SymbolView name={symbolNames[name] as React.ComponentProps<typeof SymbolView>['name']} tintColor={color} size={size} />;
 }
@@ -37,14 +41,55 @@ export function Brand() {
 }
 
 export function Page({ children }: { children: ReactNode }) {
+  const focused = useIsFocused();
   return <SafeAreaView style={s.safe} edges={['top']}>
     <View pointerEvents="none" style={s.glowTop} />
     <View pointerEvents="none" style={s.glowSide} />
-    <ScrollView style={s.page} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-      <Brand />
-      {children}
-    </ScrollView>
+    <PageFocusContext.Provider value={focused}>
+      <ScrollView style={s.page} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <Reveal delay={0}><Brand /></Reveal>
+        {Children.toArray(children).map((child, index) =>
+          <Reveal key={index} delay={Math.min(index * 45, 270)}>{child}</Reveal>)}
+      </ScrollView>
+    </PageFocusContext.Provider>
   </SafeAreaView>;
+}
+
+export function Reveal({ children, delay = 0, style }: { children: ReactNode; delay?: number; style?: StyleProp<ViewStyle> }) {
+  const reduced = useReduceMotion();
+  const focused = useContext(PageFocusContext);
+  const [progress] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    if (reduced === null || !focused) return;
+    if (reduced) { progress.setValue(1); return; }
+    progress.setValue(0);
+    const animation = Animated.timing(progress, {
+      toValue: 1, delay, duration: 360, easing: Easing.out(Easing.cubic), useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [delay, focused, progress, reduced]);
+  return <Animated.View style={[style, {
+    opacity: reduced ? 1 : progress,
+    transform: [{ translateY: reduced ? 0 : progress.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }],
+  }]}>{children}</Animated.View>;
+}
+
+export function MotionPressable({ children, onPress, style, disabled, accessibilityRole = 'button', accessibilityState }: {
+  children: ReactNode; onPress: () => void; style?: StyleProp<ViewStyle>; disabled?: boolean;
+  accessibilityRole?: 'button' | 'tab'; accessibilityState?: { selected?: boolean };
+}) {
+  const reduced = useReduceMotion();
+  const [scale] = useState(() => new Animated.Value(1));
+  const springTo = (value: number) => {
+    if (reduced !== false) return;
+    Animated.spring(scale, { toValue: value, speed: 28, bounciness: 5, useNativeDriver: true }).start();
+  };
+  return <Animated.View style={[style, { transform: [{ scale }] }]}>
+    <Pressable accessibilityRole={accessibilityRole} accessibilityState={accessibilityState} disabled={disabled}
+      onPress={onPress} onPressIn={() => springTo(.96)} onPressOut={() => springTo(1)}
+      style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>{children}</Pressable>
+  </Animated.View>;
 }
 
 export function Title({ eyebrow, children, subtitle }: { eyebrow?: string; children: ReactNode; subtitle?: string }) {
@@ -56,36 +101,45 @@ export function Card({ children, style }: { children: ReactNode; style?: StylePr
 export function Label({ children }: { children: ReactNode }) { return <Text style={s.label}>{children}</Text>; }
 export function Input(props: TextInputProps) { return <TextInput placeholderTextColor={theme.muted} {...props} style={[s.input, props.style]} />; }
 export function Button({ children, onPress, secondary, disabled }: { children: ReactNode; onPress: () => void; secondary?: boolean; disabled?: boolean }) {
-  return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={({ pressed }) => [s.button, secondary && s.secondary, disabled && { opacity: .45 }, pressed && { transform: [{ scale: .985 }] }]}>
+  return <MotionPressable disabled={disabled} onPress={onPress} style={[s.button, secondary && s.secondary, disabled && { opacity: .45 }]}>
     <Text style={[s.buttonText, secondary && { color: theme.text }]}>{children}</Text>
-  </Pressable>;
+  </MotionPressable>;
 }
 export function Meter({ value, max, color = theme.accent }: { value: number; max: number; color?: string }) {
-  const progress = useRef(new Animated.Value(0)).current;
+  const [progress] = useState(() => new Animated.Value(0));
+  const reduced = useReduceMotion();
   const fraction = Math.min(1, Math.max(0, max > 0 ? value / max : 0));
   useEffect(() => {
-    let active = true;
-    AccessibilityInfo.isReduceMotionEnabled().then((reduced) => {
-      if (!active) return;
-      if (reduced) progress.setValue(fraction);
-      else Animated.timing(progress, { toValue: fraction, duration: 500, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
-    }).catch(() => progress.setValue(fraction));
-    return () => { active = false; progress.stopAnimation(); };
-  }, [fraction, progress]);
+    if (reduced === null) return;
+    if (reduced) { progress.setValue(fraction); return; }
+    const animation = Animated.timing(progress, { toValue: fraction, duration: 540, easing: Easing.out(Easing.cubic), useNativeDriver: false });
+    animation.start();
+    return () => animation.stop();
+  }, [fraction, progress, reduced]);
   return <View style={s.track} accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: max || 1, now: value }}>
     <Animated.View style={[s.fill, { backgroundColor: color, width: progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]} />
   </View>;
 }
 export function Orbit({ value, max }: { value: number; max: number }) {
   const progress = Math.min(1, Math.max(0, max > 0 ? value / max : 0));
+  const reduced = useReduceMotion();
+  const [sweep] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    if (reduced === null) return;
+    if (reduced) { sweep.setValue(progress); return; }
+    const animation = Animated.timing(sweep, { toValue: progress, duration: 750, easing: Easing.out(Easing.cubic), useNativeDriver: true });
+    animation.start();
+    return () => animation.stop();
+  }, [progress, reduced, sweep]);
   return <View style={s.orbit} accessibilityLabel={max ? `${Math.round(progress * 100)} percent of daily energy guide` : 'Daily energy guide not set'}>
     {Array.from({ length: 40 }, (_, index) => {
       const angle = -90 + index * 9;
       const radians = angle * Math.PI / 180;
-      return <View key={index} style={{
+      return <Animated.View key={index} style={{
         position: 'absolute', left: 70 + Math.cos(radians) * 61 - 2, top: 70 + Math.sin(radians) * 61 - 6,
         width: 4, height: 12, borderRadius: 3,
-        backgroundColor: index < Math.round(progress * 40) ? theme.accent : 'rgba(255,255,255,0.14)',
+        backgroundColor: theme.accent,
+        opacity: sweep.interpolate({ inputRange: [Math.max(0, index / 40), Math.min(1, (index + 1) / 40)], outputRange: [0.14, 1], extrapolate: 'clamp' }),
         transform: [{ rotate: `${angle + 90}deg` }],
       }} />;
     })}

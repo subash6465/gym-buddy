@@ -27,3 +27,7 @@ Protein starts at 0.8–1.6 g/kg depending on activity and goal. Water shows an 
 ## Data and checks
 
 Logs and profile data are stored on the device with AsyncStorage. Meal photos are used only for the current estimate and are not saved with the meal. Run `npm test` for the birthday, target, and meal-category rules; run `npx tsc --noEmit` for type checking.
+
+## Android and iOS builds
+
+The shared app targets both Android and iOS. Once signed in to an Expo account, use `npx eas-cli@latest build --platform all --profile preview` for installable test builds or `npx eas-cli@latest build --platform all --profile production` for store builds. EAS will ask for the Android package name, iOS bundle identifier, and signing credentials on first setup. The `preview` profile produces an Android APK and an internally distributed iOS build; the `production` profile produces an Android App Bundle and an iOS store build.
