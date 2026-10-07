@@ -21,7 +21,7 @@ export default function ProfileScreen() {
   const height = Number(profile.heightCm);
   const bmi = latest && height > 0 ? latest.kg / ((height / 100) ** 2) : null;
   return <Page>
-    <Title eyebrow="MAKE IT YOURS" subtitle="Your details stay on this device in the first version.">Your journey</Title>
+    <Title eyebrow="YOUR JOURNEY" subtitle="Your details stay on this device in the first version.">Made for your goals.</Title>
     <Card><Text style={{ color: theme.text, fontSize: 20, fontWeight: '800' }}>About you</Text>
       <Label>NAME</Label><Input value={profile.name} onChangeText={(name) => store.updateProfile({ name })} placeholder="Your name" />
       <Label>DATE OF BIRTH</Label><BirthDatePicker value={profile.dob} onChange={(dob) => store.updateProfile({ dob })} />
@@ -38,7 +38,7 @@ export default function ProfileScreen() {
       <Text style={ui.muted}>The published equation has female and male versions. Choose the one appropriate for your physiology or skip automatic estimates. This is separate from gender identity.</Text>
       <Pressable onPress={() => store.updateProfile({ nutritionCaution: !profile.nutritionCaution })} style={{ padding: 14, backgroundColor: profile.nutritionCaution ? '#493A31' : theme.cardAlt, borderRadius: 12 }}><Text style={{ color: theme.text, fontWeight: '700' }}>{profile.nutritionCaution ? '☑' : '□'} Pregnancy, breastfeeding, or a condition needing a special diet</Text></Pressable>
     </Card>
-    <Card style={{ backgroundColor: '#20352B', borderColor: '#385140' }}><Text style={{ color: theme.accent, fontWeight: '800' }}>SUGGESTED DAILY TARGETS</Text>
+    <Card style={{ backgroundColor: 'rgba(45,104,106,0.28)', borderColor: 'rgba(118,240,219,0.3)' }}><Text style={{ color: theme.accent, fontWeight: '800' }}>SUGGESTED DAILY TARGETS</Text>
       {targets ? <><Text style={{ color: theme.text, fontSize: 27, fontWeight: '800' }}>{targets.calories} kcal</Text><Text style={{ color: theme.text, fontSize: 18, fontWeight: '700' }}>{targets.protein} g protein · {targets.water} ml drinks</Text><Text style={ui.muted}>Estimated maintenance: {targets.maintenance} kcal. Goal adjustment: {profile.goal === 'lose' ? 'about −300 kcal' : profile.goal === 'gain' ? 'about +200 kcal' : 'none'}. Protein guide: {targets.proteinFactor} g/kg.</Text><Text style={ui.muted}>Water is a starting drinks target; food also supplies water. Heat, exercise, illness and medical conditions can change your needs. These are estimates, not prescriptions.</Text></> : <Text style={ui.muted}>Enter a valid birth date (age 20+), height, current weight, and equation reference to see estimates. Automatic targets are paused when special dietary care is selected or when weight loss is selected at a low BMI.</Text>}
     </Card>
     <Card><Text style={{ color: theme.text, fontSize: 20, fontWeight: '800' }}>Preferences & care</Text><Label>ALLERGIES OR FOODS TO AVOID</Label><Input value={profile.allergies} onChangeText={(allergies) => store.updateProfile({ allergies })} placeholder="e.g. peanuts, dairy" multiline /><Label>INJURIES, PAIN OR OTHER CONCERNS</Label><Input value={profile.concerns} onChangeText={(concerns) => store.updateProfile({ concerns })} placeholder="Anything your plan should consider" multiline style={{ minHeight: 72, textAlignVertical: 'top' }} /><Text style={ui.muted}>Seek qualified guidance for injuries, symptoms, or dietary restrictions needing medical care.</Text></Card>

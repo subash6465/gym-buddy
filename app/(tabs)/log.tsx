@@ -2,13 +2,14 @@ import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
 import { Alert, Image, Pressable, Text, View } from 'react-native';
 import MealTimePicker from '@/components/MealTimePicker';
-import { Button, Card, Input, Label, Page, Row, Title, ui } from '@/components/UI';
+import { Button, Card, Icon, Input, Label, Page, Row, Title, ui } from '@/components/UI';
 import { estimateMeal, MealEstimate } from '@/lib/mealEstimate';
 import { Meal, today, useStore } from '@/lib/store';
 import { theme } from '@/lib/theme';
 
 type Mode = 'meal' | 'workout' | 'weight' | 'water';
 const clockTime = () => { const date = new Date(); return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`; };
+
 export default function Log() {
   const store = useStore();
   const [mode, setMode] = useState<Mode>('meal');
@@ -23,6 +24,7 @@ export default function Log() {
   const [name, setName] = useState(''); const [note, setNote] = useState('');
   const [minutes, setMinutes] = useState(''); const [weight, setWeight] = useState(''); const [water, setWater] = useState('');
   const existing = mealType !== 'snack' ? store.meals.find((meal) => meal.date === today() && meal.type === mealType) : null;
+
   async function pickPhoto(camera: boolean) {
     if (camera) {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
@@ -64,32 +66,53 @@ export default function Log() {
     store.addWorkout({ date: today(), name: name.trim(), minutes: duration, note: note.trim() });
     setName(''); setNote(''); setMinutes(''); Alert.alert('Workout logged', 'Nice work showing up today.');
   }
+
   return <Page>
-    <Title eyebrow="BUILD THE HABIT" subtitle="A few quick entries make your progress visible.">Log activity</Title>
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{(['meal', 'workout', 'weight', 'water'] as const).map((option) => <Pressable key={option} onPress={() => setMode(option)} style={{ minWidth: '23%', flexGrow: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 13, backgroundColor: mode === option ? theme.accent : theme.card }}><Text style={{ color: mode === option ? theme.bg : theme.text, fontWeight: '800', textTransform: 'capitalize' }}>{option}</Text></Pressable>)}</View>
+    <Title eyebrow="BUILD THE HABIT" subtitle="Capture the details that help you grow.">Log it. Keep moving.</Title>
+    <View style={{ flexDirection: 'row', gap: 5, padding: 5, borderRadius: 16, backgroundColor: theme.cardAlt, borderWidth: 1, borderColor: theme.line }}>
+      {(['meal', 'workout', 'weight', 'water'] as const).map((option) =>
+        <Pressable key={option} onPress={() => setMode(option)} accessibilityRole="button" accessibilityState={{ selected: mode === option }}
+          style={({ pressed }) => ({ flex: 1, minHeight: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: mode === option ? theme.accent : 'transparent', opacity: pressed ? .7 : 1 })}>
+          <Text style={{ color: mode === option ? theme.ink : theme.muted, fontWeight: '800', fontSize: 11, textTransform: 'capitalize' }}>{option}</Text>
+        </Pressable>)}
+    </View>
     {mode === 'meal' ? <>
-      <Card><Text style={{ color: theme.text, fontSize: 20, fontWeight: '800' }}>What did you eat?</Text>
-        <Label>MEAL</Label><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{(['breakfast', 'lunch', 'dinner', 'snack'] as const).map((type) => <Pressable key={type} onPress={() => setMealType(type)} style={{ paddingHorizontal: 14, paddingVertical: 11, borderRadius: 12, backgroundColor: mealType === type ? theme.accent : theme.cardAlt }}><Text style={{ color: mealType === type ? theme.bg : theme.text, fontWeight: '800', textTransform: 'capitalize' }}>{type}</Text></Pressable>)}</View>
-        {existing && <Text style={{ color: theme.orange }}>You already logged {mealType} today. Saving a new one will replace it. Snacks can be added multiple times.</Text>}
+      <Card>
+        <Text style={{ color: theme.text, fontSize: 19, fontWeight: '800' }}>What did you eat?</Text>
+        <Label>MEAL</Label>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
+          {(['breakfast', 'lunch', 'dinner', 'snack'] as const).map((type) =>
+            <Pressable key={type} onPress={() => { setMealType(type); setEstimate(null); }} accessibilityRole="button" accessibilityState={{ selected: mealType === type }}
+              style={{ paddingHorizontal: 12, paddingVertical: 9, borderRadius: 11, backgroundColor: mealType === type ? 'rgba(118,240,219,0.17)' : theme.cardAlt, borderWidth: 1, borderColor: mealType === type ? 'rgba(118,240,219,0.55)' : theme.line }}>
+              <Text style={{ color: mealType === type ? theme.accent : theme.text, fontWeight: '800', fontSize: 11, textTransform: 'capitalize' }}>{type}</Text>
+            </Pressable>)}
+        </View>
+        {existing && <Text style={{ color: theme.orange, fontSize: 12 }}>Saving another {mealType} today will replace the current entry. Snacks can be added more than once.</Text>}
         <Label>TIME</Label><MealTimePicker value={mealTime} onChange={setMealTime} />
-        <Label>DESCRIBE THE FOOD AND PORTION</Label><Input value={description} onChangeText={(value) => { setDescription(value); setEstimate(null); }} multiline placeholder="e.g. 2 chapatis, 1 bowl dal, paneer curry cooked with oil" style={{ minHeight: 100, textAlignVertical: 'top' }} />
-        <Text style={ui.muted}>Mention serving size, ingredients, oil or sauces for a better estimate.</Text>
-      </Card>
-      <Card><Text style={{ color: theme.text, fontSize: 20, fontWeight: '800' }}>Add a photo</Text><Text style={ui.muted}>Optional. The photo and description are sent to the AI service when you tap Estimate. A photo cannot reveal every ingredient or exact portion.</Text>
+        <Label>FOOD AND PORTION</Label>
+        <Input value={description} onChangeText={(value) => { setDescription(value); setEstimate(null); }} multiline placeholder="e.g. 2 chapatis, 1 bowl dal, paneer curry cooked with oil" style={{ minHeight: 94, textAlignVertical: 'top' }} />
+        <Text style={[ui.muted, { fontSize: 11 }]}>Include serving size, ingredients, oil or sauces for a better estimate.</Text>
         <Row><View style={{ flex: 1 }}><Button secondary onPress={() => pickPhoto(true)}>Take photo</Button></View><View style={{ flex: 1 }}><Button secondary onPress={() => pickPhoto(false)}>Choose photo</Button></View></Row>
-        {photo && <Image source={{ uri: photo }} style={{ width: '100%', height: 190, borderRadius: 14 }} />}
+        {photo && <Image source={{ uri: photo }} style={{ width: '100%', height: 170, borderRadius: 13 }} />}
+        <Row><Icon name="camera" color={theme.accent} size={17} /><Text style={[ui.muted, { flex: 1, fontSize: 11 }]}>Photo is optional. Only the submitted photo and description go to the AI service.</Text></Row>
       </Card>
       <Button onPress={analyze} disabled={estimating}>{estimating ? 'Estimating…' : estimate ? 'Estimate again' : 'Estimate nutrition with AI'}</Button>
       {error ? <Card><Text style={{ color: theme.red }}>{error}</Text></Card> : null}
-      {estimate && <Card style={{ backgroundColor: '#20352B', borderColor: '#385140' }}><Text style={{ color: theme.accent, fontWeight: '800' }}>AI ESTIMATE · REVIEW BEFORE SAVING</Text><Text style={{ color: theme.text, fontSize: 21, fontWeight: '800' }}>{estimate.name}</Text>
-        <Text style={{ color: theme.text, fontSize: 25, fontWeight: '800' }}>~{Math.round(estimate.calories)} kcal</Text>
+      {estimate && <Card style={{ backgroundColor: 'rgba(45,104,106,0.28)', borderColor: 'rgba(118,240,219,0.3)' }}>
+        <Row><Icon name="sparkles" color={theme.accent} size={19} /><Text style={{ color: theme.accent, fontWeight: '800', fontSize: 10, letterSpacing: 1 }}>AI ESTIMATE · REVIEW BEFORE SAVING</Text></Row>
+        <Text style={{ color: theme.text, fontSize: 20, fontWeight: '800' }}>{estimate.name}</Text>
+        <Text style={{ color: theme.text, fontSize: 27, fontWeight: '800' }}>~{Math.round(estimate.calories)} kcal</Text>
         <Text style={{ color: theme.text }}>Protein {Math.round(estimate.protein)} g · Carbs {Math.round(estimate.carbs)} g · Fat {Math.round(estimate.fat)} g</Text>
         <Text style={ui.muted}>Fibre {Math.round(estimate.fibre)} g · Sugar {Math.round(estimate.sugar)} g</Text>
-        <Text style={ui.muted}>Assumptions: {estimate.assumptions}</Text><Text style={ui.muted}>Check the description and estimate. For a better result, add missing ingredients or portions and estimate again. Do not use a photo estimate to verify allergens.</Text>
+        <Text style={ui.muted}>Assumptions: {estimate.assumptions}</Text>
+        <Text style={[ui.muted, { fontSize: 11 }]}>Check the estimate. Add missing ingredients or portions and estimate again. Do not use a photo estimate to verify allergens.</Text>
         <Button onPress={saveMeal}>{existing ? `Replace ${mealType}` : 'Save meal'}</Button>
       </Card>}
-    </> : <Card><Text style={{ color: theme.text, fontSize: 20, fontWeight: '800' }}>{mode === 'weight' ? 'Weight check-in' : mode === 'water' ? 'Water intake' : 'Workout details'}</Text>
-      {mode === 'weight' ? <><Label>WEIGHT (KG)</Label><Input value={weight} onChangeText={setWeight} keyboardType="decimal-pad" placeholder="e.g. 72.5" /></> : mode === 'water' ? <><Label>AMOUNT (ML)</Label><Input value={water} onChangeText={setWater} keyboardType="number-pad" placeholder="e.g. 250" /></> : <><Label>ACTIVITY</Label><Input value={name} onChangeText={setName} placeholder="e.g. strength training" /><Label>EXERCISES OR NOTES</Label><Input value={note} onChangeText={setNote} multiline placeholder="e.g. squats, rows and presses" style={{ minHeight: 78, textAlignVertical: 'top' }} /><Label>DURATION (MINUTES)</Label><Input value={minutes} onChangeText={setMinutes} keyboardType="number-pad" placeholder="e.g. 45" /></>}
+    </> : <Card>
+      <Text style={{ color: theme.text, fontSize: 19, fontWeight: '800' }}>{mode === 'weight' ? 'Weight check-in' : mode === 'water' ? 'Hydration check-in' : 'Workout details'}</Text>
+      {mode === 'weight' ? <><Label>WEIGHT (KG)</Label><Input value={weight} onChangeText={setWeight} keyboardType="decimal-pad" placeholder="e.g. 72.5" /></> :
+        mode === 'water' ? <><Label>AMOUNT (ML)</Label><Input value={water} onChangeText={setWater} keyboardType="number-pad" placeholder="e.g. 250" /></> :
+          <><Label>ACTIVITY</Label><Input value={name} onChangeText={setName} placeholder="e.g. strength training" /><Label>EXERCISES OR NOTES</Label><Input value={note} onChangeText={setNote} multiline placeholder="e.g. squats, rows and presses" style={{ minHeight: 78, textAlignVertical: 'top' }} /><Label>DURATION (MINUTES)</Label><Input value={minutes} onChangeText={setMinutes} keyboardType="number-pad" placeholder="e.g. 45" /></>}
       <Button onPress={saveOther}>Save {mode}</Button>
     </Card>}
   </Page>;
