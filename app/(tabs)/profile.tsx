@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import BirthDatePicker from '@/components/BirthDatePicker';
-import { Button, Card, Input, Label, Page, Row, Title, ui } from '@/components/UI';
+import { Button, Card, Input, Label, MotionPressable, Page, Reveal, Row, Title, ui } from '@/components/UI';
 import { Goal, useStore } from '@/lib/store';
 import { ageOnDate, suggestedTargets } from '@/lib/targets';
 import { useClock } from '@/lib/clock';
 import { theme } from '@/lib/theme';
 
 function Choice<T extends string>({ options, value, onChange }: { options: readonly (readonly [T, string])[]; value: T; onChange: (value: T) => void }) {
-  return <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{options.map(([option, label]) => <Pressable key={option} onPress={() => onChange(option)} style={{ paddingHorizontal: 14, paddingVertical: 11, borderRadius: 12, backgroundColor: value === option ? theme.accent : theme.cardAlt }}><Text style={{ color: value === option ? theme.bg : theme.text, fontWeight: '800' }}>{label}</Text></Pressable>)}</View>;
+  return <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{options.map(([option, label]) => <MotionPressable key={option} onPress={() => onChange(option)} accessibilityState={{ selected: value === option }} style={{ paddingHorizontal: 14, paddingVertical: 11, borderRadius: 12, backgroundColor: value === option ? theme.accent : theme.cardAlt }}><Text style={{ color: value === option ? theme.bg : theme.text, fontWeight: '800' }}>{label}</Text></MotionPressable>)}</View>;
 }
 export default function ProfileScreen() {
   const store = useStore();
@@ -43,11 +43,11 @@ export default function ProfileScreen() {
     </Card>
     <Card><Text style={{ color: theme.text, fontSize: 20, fontWeight: '800' }}>Preferences & care</Text><Label>ALLERGIES OR FOODS TO AVOID</Label><Input value={profile.allergies} onChangeText={(allergies) => store.updateProfile({ allergies })} placeholder="e.g. peanuts, dairy" multiline /><Label>INJURIES, PAIN OR OTHER CONCERNS</Label><Input value={profile.concerns} onChangeText={(concerns) => store.updateProfile({ concerns })} placeholder="Anything your plan should consider" multiline style={{ minHeight: 72, textAlignVertical: 'top' }} /><Text style={ui.muted}>Seek qualified guidance for injuries, symptoms, or dietary restrictions needing medical care.</Text></Card>
     <Button secondary onPress={() => setShowHistory(!showHistory)}>{showHistory ? 'Hide' : 'Show'} log history</Button>
-    {showHistory && <Card><Text style={{ color: theme.text, fontSize: 20, fontWeight: '800' }}>Log history</Text>
+    {showHistory && <Reveal><Card><Text style={{ color: theme.text, fontSize: 20, fontWeight: '800' }}>Log history</Text>
       {store.meals.length + store.workouts.length + store.weighIns.length === 0 ? <Text style={ui.muted}>No entries yet.</Text> : null}
       {store.meals.map((meal) => <Row key={meal.id}><View style={{ flex: 1 }}><Text style={{ color: theme.text, fontWeight: '700' }}>{meal.name}</Text><Text style={ui.muted}>{meal.date} · {meal.time} · {meal.type} · {meal.calories} kcal</Text></View><Pressable onPress={() => Alert.alert('Delete meal?', meal.name, [{ text: 'Cancel' }, { text: 'Delete', style: 'destructive', onPress: () => store.removeMeal(meal.id) }])}><Text style={{ color: theme.red }}>Delete</Text></Pressable></Row>)}
       {store.workouts.map((workout) => <Row key={workout.id}><View style={{ flex: 1 }}><Text style={{ color: theme.text, fontWeight: '700' }}>{workout.name}</Text><Text style={ui.muted}>{workout.date} · {workout.minutes} min</Text></View><Pressable onPress={() => Alert.alert('Delete workout?', workout.name, [{ text: 'Cancel' }, { text: 'Delete', style: 'destructive', onPress: () => store.removeWorkout(workout.id) }])}><Text style={{ color: theme.red }}>Delete</Text></Pressable></Row>)}
       {store.weighIns.map((entry) => <Text key={entry.id} style={ui.muted}>{entry.date} · {entry.kg} kg</Text>)}
-    </Card>}
+    </Card></Reveal>}
   </Page>;
 }
