@@ -1,6 +1,8 @@
 import { Text, View } from 'react-native';
 import { Card, Page, Title, ui } from '@/components/UI';
 import { useStore } from '@/lib/store';
+import { useClock } from '@/lib/clock';
+import { suggestedTargets } from '@/lib/targets';
 import { theme } from '@/lib/theme';
 
 const routines = {
@@ -16,14 +18,16 @@ const routines = {
   ],
 };
 export default function Plan() {
-  const { profile } = useStore();
+  const { profile, weighIns } = useStore();
+  const now = useClock();
+  const targets = suggestedTargets(profile, weighIns[0]?.kg, now);
   const goalLabel = { lose: 'Weight loss', gain: 'Weight gain', maintain: 'Maintenance' }[profile.goal];
   return <Page>
     <Title eyebrow="A STEADY PATH" subtitle="A simple starting structure that you can adapt to your day.">Your plan</Title>
     <Card style={{ backgroundColor: '#20352B', borderColor: '#385140' }}>
       <Text style={{ color: theme.accent, fontSize: 12, fontWeight: '800' }}>CURRENT DIRECTION</Text>
       <Text style={{ color: theme.text, fontSize: 24, fontWeight: '800' }}>{goalLabel}</Text>
-      <Text style={ui.muted}>{profile.setting === 'gym' ? 'Gym' : 'Home'} workouts · {profile.calorieTarget} kcal daily target · {profile.proteinTarget} g protein target</Text>
+      <Text style={ui.muted}>{profile.setting === 'gym' ? 'Gym' : 'Home'} workouts{targets ? ` · ~${targets.calories} kcal daily · ~${targets.protein} g protein` : ' · Add your details and weight for suggested targets'}</Text>
     </Card>
     <Text style={{ color: theme.text, fontSize: 20, fontWeight: '800' }}>Movement starter</Text>
     {routines[profile.setting].map(([day, work]) => <Card key={day}><Text style={{ color: theme.accent, fontWeight: '800' }}>{day}</Text><Text style={{ color: theme.text, fontSize: 16, lineHeight: 24 }}>{work}</Text><Text style={ui.muted}>Choose a comfortable effort and record what you actually do.</Text></Card>)}

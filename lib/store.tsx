@@ -2,17 +2,19 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { theme } from './theme';
+import { withSavedMeal } from './meals';
 
 export type Goal = 'lose' | 'gain' | 'maintain';
 export type Meal = {
-  id: string; date: string; name: string; note: string;
+  id: string; date: string; time: string; type: 'breakfast' | 'lunch' | 'dinner' | 'snack'; name: string; note: string;
   calories: number; protein: number; carbs: number; fat: number; fibre: number; sugar: number;
 };
 export type Workout = { id: string; date: string; name: string; minutes: number; note: string };
 export type WeighIn = { id: string; date: string; kg: number };
 export type Profile = {
-  name: string; goal: Goal; setting: 'gym' | 'home'; age: string; heightCm: string;
-  allergies: string; concerns: string; calorieTarget: number; proteinTarget: number; waterTarget: number;
+  name: string; goal: Goal; setting: 'gym' | 'home'; dob: string; heightCm: string;
+  equation: 'female' | 'male' | ''; activity: 'sedentary' | 'light' | 'moderate' | 'high'; nutritionCaution: boolean;
+  allergies: string; concerns: string;
 };
 type Data = { profile: Profile; meals: Meal[]; workouts: Workout[]; weighIns: WeighIn[]; water: Record<string, number> };
 type Store = Data & {
@@ -27,13 +29,12 @@ type Store = Data & {
 };
 
 const initial: Data = {
-  profile: { name: '', goal: 'maintain', setting: 'gym', age: '', heightCm: '', allergies: '', concerns: '', calorieTarget: 2000, proteinTarget: 100, waterTarget: 2500 },
+  profile: { name: '', goal: 'maintain', setting: 'gym', dob: '', heightCm: '', equation: '', activity: 'light', nutritionCaution: false, allergies: '', concerns: '' },
   meals: [], workouts: [], weighIns: [], water: {},
 };
 const key = 'gym-buddy-data-v1';
 const Context = createContext<Store | null>(null);
-export const today = () => {
-  const date = new Date();
+export const today = (date = new Date()) => {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 };
 const newId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -45,7 +46,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.getItem(key).then((raw) => {
       if (raw) {
         const saved = JSON.parse(raw) as Partial<Data>;
-        setData({ ...initial, ...saved, profile: { ...initial.profile, ...saved.profile } });
+        setData({ ...initial, ...saved, profile: { ...initial.profile, ...saved.profile }, meals: (saved.meals || []).map((meal) => ({ ...meal, type: meal.type || 'snack', time: meal.time || '12:00' })) });
       }
     }).catch(() => {}).finally(() => setReady(true));
   }, []);
@@ -53,7 +54,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<Store>(() => ({
     ...data, ready,
     updateProfile: (patch) => setData((old) => ({ ...old, profile: { ...old.profile, ...patch } })),
-    addMeal: (meal) => setData((old) => ({ ...old, meals: [{ ...meal, id: newId() }, ...old.meals] })),
+    addMeal: (meal) => setData((old) => ({ ...old, meals: withSavedMeal(old.meals, { ...meal, id: newId() }) })),
     addWorkout: (workout) => setData((old) => ({ ...old, workouts: [{ ...workout, id: newId() }, ...old.workouts] })),
     addWeighIn: (kg) => setData((old) => ({ ...old, weighIns: [{ id: newId(), date: today(), kg }, ...old.weighIns] })),
     addWater: (date, ml) => setData((old) => ({ ...old, water: { ...old.water, [date]: Math.max(0, (old.water[date] || 0) + ml) } })),
