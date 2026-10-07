@@ -1,31 +1,42 @@
-import { StyleSheet } from 'react-native';
+import { router } from 'expo-router';
+import { Text, View } from 'react-native';
+import { Button, Card, Meter, Page, Row, Title, ui } from '@/components/UI';
+import { today, useStore } from '@/lib/store';
+import { theme } from '@/lib/theme';
 
-import EditScreenInfo from '@/components/EditScreenInfo';
-import { Text, View } from '@/components/Themed';
-
-export default function TabOneScreen() {
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Tab One</Text>
-      <View style={styles.separator} lightColor="#eee" darkColor="rgba(255,255,255,0.1)" />
-      <EditScreenInfo path="app/(tabs)/index.tsx" />
+const sum = (items: any[], key: string) => items.reduce((total, item) => total + (Number(item[key]) || 0), 0);
+export default function Today() {
+  const store = useStore();
+  const date = today();
+  const meals = store.meals.filter((item) => item.date === date);
+  const workouts = store.workouts.filter((item) => item.date === date);
+  const calories = sum(meals, 'calories');
+  const protein = sum(meals, 'protein');
+  const water = store.water[date] || 0;
+  const firstName = store.profile.name.trim().split(' ')[0];
+  return <Page>
+    <Title eyebrow="YOUR DAILY COMPANION" subtitle={new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}>Hey{firstName ? `, ${firstName}` : ''} 👋</Title>
+    <Card style={{ backgroundColor: '#20352B', borderColor: '#385140' }}>
+      <Text style={{ color: theme.accent, fontWeight: '800', fontSize: 12, letterSpacing: 1 }}>TODAY AT A GLANCE</Text>
+      <Text style={{ color: theme.text, fontSize: 25, fontWeight: '800' }}>{meals.length ? 'Keep your momentum.' : 'A fresh start today.'}</Text>
+      <Text style={ui.muted}>{meals.length ? `${meals.length} meal${meals.length === 1 ? '' : 's'} logged · ${workouts.length} workout${workouts.length === 1 ? '' : 's'} completed` : 'Log your first meal or workout to see your progress.'}</Text>
+      <Button onPress={() => router.push('/(tabs)/log')}>+ Add an activity</Button>
+    </Card>
+    <Row><Text style={{ color: theme.text, fontSize: 20, fontWeight: '800', flex: 1 }}>Daily targets</Text><Text style={ui.muted}>Set in You</Text></Row>
+    <Card>
+      <Row><Text style={{ color: theme.text, fontSize: 18, fontWeight: '800', flex: 1 }}>Calories</Text><Text style={{ color: theme.accent, fontWeight: '800' }}>{Math.round(calories)} / {store.profile.calorieTarget} kcal</Text></Row>
+      <Meter value={calories} max={store.profile.calorieTarget} />
+      <Row><Text style={{ color: theme.text, flex: 1 }}>Protein</Text><Text style={{ color: theme.text }}>{Math.round(protein)} / {store.profile.proteinTarget} g</Text></Row>
+      <Meter value={protein} max={store.profile.proteinTarget} color={theme.orange} />
+      <Row><Text style={{ color: theme.text, flex: 1 }}>Water</Text><Text style={{ color: theme.text }}>{water} / {store.profile.waterTarget} ml</Text></Row>
+      <Meter value={water} max={store.profile.waterTarget} color="#7BC9ED" />
+      <Button secondary onPress={() => store.addWater(date, 250)}>+ 250 ml water</Button>
+    </Card>
+    <Row><Text style={{ color: theme.text, fontSize: 20, fontWeight: '800' }}>Nutrition details</Text></Row>
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+      {([['Carbs', 'carbs'], ['Fat', 'fat'], ['Fibre', 'fibre'], ['Sugar', 'sugar']] as const).map(([label, key]) => <Card key={key} style={{ width: '48%', flexGrow: 1 }}><Text style={ui.muted}>{label}</Text><Text style={{ color: theme.text, fontSize: 24, fontWeight: '800' }}>{Math.round(sum(meals, key))}<Text style={{ fontSize: 13, color: theme.muted }}> g</Text></Text></Card>)}
     </View>
-  );
+    <Text style={{ color: theme.text, fontSize: 20, fontWeight: '800' }}>Recent activity</Text>
+    {meals.length === 0 && workouts.length === 0 ? <Card><Text style={ui.muted}>Your meals and workouts will appear here after you log them.</Text></Card> : [...meals.map((item) => ({ id: item.id, title: item.name, detail: `${Math.round(item.calories)} kcal · ${Math.round(item.protein)} g protein`, kind: 'Meal' })), ...workouts.map((item) => ({ id: item.id, title: item.name, detail: `${item.minutes} min`, kind: 'Workout' }))].slice(0, 5).map((item) => <Card key={item.id}><Row><View style={{ flex: 1 }}><Text style={{ color: theme.accent, fontSize: 11, fontWeight: '800' }}>{item.kind.toUpperCase()}</Text><Text style={{ color: theme.text, fontSize: 16, fontWeight: '700' }}>{item.title}</Text></View><Text style={ui.muted}>{item.detail}</Text></Row></Card>)}
+  </Page>;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  separator: {
-    marginVertical: 30,
-    height: 1,
-    width: '80%',
-  },
-});

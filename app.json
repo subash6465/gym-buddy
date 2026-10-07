@@ -1,12 +1,12 @@
 {
   "expo": {
-    "name": "gym-buddy",
+    "name": "Gym Buddy",
     "slug": "gym-buddy",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "gymbuddy",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true
     },
