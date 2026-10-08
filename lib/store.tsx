@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { theme } from './theme';
 import { withSavedMeal } from './meals';
+import { useAuth } from './auth';
 
 export type Goal = 'lose' | 'gain' | 'maintain';
 export type Meal = {
@@ -15,10 +16,14 @@ export type Profile = {
   name: string; goal: Goal; setting: 'gym' | 'home'; dob: string; heightCm: string;
   equation: 'female' | 'male' | ''; activity: 'sedentary' | 'light' | 'moderate' | 'high'; nutritionCaution: boolean;
   allergies: string; concerns: string;
+  fitnessPlan: string; weightKg: number;
 };
 type Data = { profile: Profile; meals: Meal[]; workouts: Workout[]; weighIns: WeighIn[]; water: Record<string, number> };
 type Store = Data & {
   ready: boolean;
+  profileSyncError: string;
+  syncProfile: () => Promise<void>;
+  completeOnboarding: (profile: Profile) => Promise<void>;
   updateProfile: (patch: Partial<Profile>) => void;
   addMeal: (meal: Omit<Meal, 'id'>) => void;
   addWorkout: (workout: Omit<Workout, 'id'>) => void;
@@ -29,10 +34,9 @@ type Store = Data & {
 };
 
 const initial: Data = {
-  profile: { name: '', goal: 'maintain', setting: 'gym', dob: '', heightCm: '', equation: '', activity: 'light', nutritionCaution: false, allergies: '', concerns: '' },
+  profile: { name: '', goal: 'maintain', setting: 'gym', dob: '', heightCm: '', equation: '', activity: 'light', nutritionCaution: false, allergies: '', concerns: '', fitnessPlan: '', weightKg: 0 },
   meals: [], workouts: [], weighIns: [], water: {},
 };
-const key = 'gym-buddy-data-v1';
 const Context = createContext<Store | null>(null);
 export const today = (date = new Date()) => {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -40,28 +44,56 @@ export const today = (date = new Date()) => {
 const newId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
+  const auth = useAuth();
   const [data, setData] = useState<Data>(initial);
   const [ready, setReady] = useState(false);
+  const [loadedUserId, setLoadedUserId] = useState('');
+  const [profileSyncError, setProfileSyncError] = useState('');
+  const key = `gym-buddy-data-v2-${auth.user.id}`;
   useEffect(() => {
+    if (!auth.ready) return;
+    let active = true;
+    if (!auth.user.id) { setData(initial); setLoadedUserId(''); setReady(true); return; }
+    setReady(false);
     AsyncStorage.getItem(key).then((raw) => {
+      if (!active) return;
+      let saved: Partial<Data> = {};
       if (raw) {
-        const saved = JSON.parse(raw) as Partial<Data>;
-        setData({ ...initial, ...saved, profile: { ...initial.profile, ...saved.profile }, meals: (saved.meals || []).map((meal) => ({ ...meal, type: meal.type || 'snack', time: meal.time || '12:00' })) });
+        saved = JSON.parse(raw) as Partial<Data>;
       }
-    }).catch(() => {}).finally(() => setReady(true));
-  }, []);
-  useEffect(() => { if (ready) AsyncStorage.setItem(key, JSON.stringify(data)).catch(() => {}); }, [data, ready]);
+      setData({ ...initial, ...saved, profile: { ...initial.profile, ...saved.profile, ...auth.profile },
+        meals: (saved.meals || []).map((meal) => ({ ...meal, type: meal.type || 'snack', time: meal.time || '12:00' })),
+        weighIns: saved.weighIns?.length ? saved.weighIns : auth.profile?.weightKg ? [{ id: newId(), date: today(), kg: auth.profile.weightKg }] : [], });
+    }).catch(() => {}).finally(() => { if (active) { setLoadedUserId(auth.user.id); setReady(true); } });
+    return () => { active = false; };
+  }, [auth.ready, auth.user.id]);
+  useEffect(() => { if (ready && auth.user.id && loadedUserId === auth.user.id) AsyncStorage.setItem(key, JSON.stringify(data)).catch(() => {}); }, [data, ready, key, auth.user.id, loadedUserId]);
+  useEffect(() => {
+    if (!ready || !auth.profile || JSON.stringify(data.profile) === JSON.stringify(auth.profile)) return;
+    const timer = setTimeout(() => {
+      auth.saveProfile(data.profile).then(() => setProfileSyncError('')).catch((error) => setProfileSyncError(error.message));
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [data.profile, auth.profile, ready]);
   const value = useMemo<Store>(() => ({
-    ...data, ready,
+    ...data, ready, profileSyncError,
+    syncProfile: async () => {
+      try { await auth.saveProfile(data.profile); setProfileSyncError(''); }
+      catch (error) { setProfileSyncError(error instanceof Error ? error.message : 'Could not save profile.'); throw error; }
+    },
+    completeOnboarding: async (profile) => {
+      await auth.saveProfile(profile);
+      setData((old) => ({ ...old, profile, weighIns: [{ id: newId(), date: today(), kg: profile.weightKg }, ...old.weighIns] }));
+    },
     updateProfile: (patch) => setData((old) => ({ ...old, profile: { ...old.profile, ...patch } })),
     addMeal: (meal) => setData((old) => ({ ...old, meals: withSavedMeal(old.meals, { ...meal, id: newId() }) })),
     addWorkout: (workout) => setData((old) => ({ ...old, workouts: [{ ...workout, id: newId() }, ...old.workouts] })),
-    addWeighIn: (kg) => setData((old) => ({ ...old, weighIns: [{ id: newId(), date: today(), kg }, ...old.weighIns] })),
+    addWeighIn: (kg) => setData((old) => ({ ...old, profile: { ...old.profile, weightKg: kg }, weighIns: [{ id: newId(), date: today(), kg }, ...old.weighIns] })),
     addWater: (date, ml) => setData((old) => ({ ...old, water: { ...old.water, [date]: Math.max(0, (old.water[date] || 0) + ml) } })),
     removeMeal: (id) => setData((old) => ({ ...old, meals: old.meals.filter((item) => item.id !== id) })),
     removeWorkout: (id) => setData((old) => ({ ...old, workouts: old.workouts.filter((item) => item.id !== id) })),
-  }), [data, ready]);
-  if (!ready) return <View style={{ flex: 1, backgroundColor: theme.bg, justifyContent: 'center' }}><ActivityIndicator color={theme.accent} /></View>;
+  }), [data, ready, profileSyncError, auth]);
+  if (!ready || auth.user.id !== loadedUserId) return <View style={{ flex: 1, backgroundColor: theme.bg, justifyContent: 'center' }}><ActivityIndicator color={theme.accent} /></View>;
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 

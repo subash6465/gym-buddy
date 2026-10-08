@@ -34,6 +34,7 @@ export default function Plan() {
     </Card>
 
     <Text style={{ color: theme.text, fontSize: 19, fontWeight: '800' }}>Movement rhythm</Text>
+    {profile.fitnessPlan ? <Card><Text style={{ color: theme.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>YOUR SCHEDULE</Text><Text style={{ color: theme.text, fontSize: 15 }}>{profile.fitnessPlan}</Text></Card> : null}
     {routines[profile.setting].map(([name, work], index) => <Card key={name} style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
       <View style={{ width: 39, height: 39, borderRadius: 13, backgroundColor: 'rgba(118,240,219,0.14)', alignItems: 'center', justifyContent: 'center' }}>
         {index === 1 ? <Icon name="water" color={theme.accent} size={20} /> : <Icon name="workout" color={theme.accent} size={20} />}

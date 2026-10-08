@@ -101,9 +101,9 @@ export function Card({ children, style }: { children: ReactNode; style?: StylePr
 export function Label({ children }: { children: ReactNode }) { return <Text style={s.label}>{children}</Text>; }
 export function Input(props: TextInputProps) { return <TextInput placeholderTextColor={theme.muted} {...props} style={[s.input, props.style]} />; }
 export function Button({ children, onPress, secondary, disabled }: { children: ReactNode; onPress: () => void; secondary?: boolean; disabled?: boolean }) {
-  return <MotionPressable disabled={disabled} onPress={onPress} style={[s.button, secondary && s.secondary, disabled && { opacity: .45 }]}>
+  return <Pressable accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} style={({ pressed }) => [s.button, secondary && s.secondary, (disabled || pressed) && { opacity: .55 }]}>
     <Text style={[s.buttonText, secondary && { color: theme.text }]}>{children}</Text>
-  </MotionPressable>;
+  </Pressable>;
 }
 export function Meter({ value, max, color = theme.accent }: { value: number; max: number; color?: string }) {
   const [progress] = useState(() => new Animated.Value(0));

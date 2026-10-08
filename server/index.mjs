@@ -1,8 +1,9 @@
 import 'dotenv/config';
 import { createServer } from 'node:http';
+import { getAccount, login, logout, register, saveProfile } from './accounts.mjs';
 
 const port = Number(process.env.PORT || 8787);
-const host = process.env.HOST || '127.0.0.1';
+const host = process.env.HOST || '0.0.0.0';
 const key = process.env.OPENAI_API_KEY;
 const schema = {
   type: 'object', additionalProperties: false,
@@ -64,11 +65,27 @@ const server = createServer(async (req, res) => {
   const origin = req.headers.origin;
   if (origin && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS, GET');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, PUT, OPTIONS, GET');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   }
   if (req.method === 'OPTIONS') return send(res, 200, {});
   if (req.method === 'GET' && req.url === '/health') return send(res, 200, { ok: true, photoAiConfigured: Boolean(key), textAiProvider: key ? 'openai' : 'ollama' });
+  if (req.method === 'GET' && req.url === '/account') {
+    try { return send(res, 200, getAccount(req.headers.authorization)); }
+    catch (error) { return send(res, error.status || 500, { error: error.message }); }
+  }
+  if (['/auth/register', '/auth/login', '/auth/logout', '/profile'].includes(req.url)) {
+    try {
+      let raw = '';
+      for await (const chunk of req) { raw += chunk; if (raw.length > 20_000) throw Object.assign(new Error('Request is too large.'), { status: 413 }); }
+      const body = raw ? JSON.parse(raw) : {};
+      if (req.url === '/auth/register' && req.method === 'POST') return send(res, 201, register(body.email, body.password));
+      if (req.url === '/auth/login' && req.method === 'POST') return send(res, 200, login(body.email, body.password));
+      if (req.url === '/auth/logout' && req.method === 'POST') { logout(req.headers.authorization); return send(res, 200, { ok: true }); }
+      if (req.url === '/profile' && req.method === 'PUT') return send(res, 200, saveProfile(req.headers.authorization, body));
+      return send(res, 405, { error: 'Method not allowed' });
+    } catch (error) { return send(res, error.status || 500, { error: error.message || 'Request failed.' }); }
+  }
   if (req.method !== 'POST' || req.url !== '/estimate-meal') return send(res, 404, { error: 'Not found' });
   let raw = '';
   try {
