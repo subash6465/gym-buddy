@@ -6,12 +6,14 @@ import { Goal, useStore } from '@/lib/store';
 import { ageOnDate, suggestedTargets } from '@/lib/targets';
 import { useClock } from '@/lib/clock';
 import { theme } from '@/lib/theme';
+import { useAuth } from '@/lib/auth';
 
 function Choice<T extends string>({ options, value, onChange }: { options: readonly (readonly [T, string])[]; value: T; onChange: (value: T) => void }) {
   return <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{options.map(([option, label]) => <MotionPressable key={option} onPress={() => onChange(option)} accessibilityState={{ selected: value === option }} style={{ paddingHorizontal: 14, paddingVertical: 11, borderRadius: 12, backgroundColor: value === option ? theme.accent : theme.cardAlt }}><Text style={{ color: value === option ? theme.bg : theme.text, fontWeight: '800' }}>{label}</Text></MotionPressable>)}</View>;
 }
 export default function ProfileScreen() {
   const store = useStore();
+  const auth = useAuth();
   const { profile } = store;
   const [showHistory, setShowHistory] = useState(false);
   const now = useClock();
@@ -21,7 +23,8 @@ export default function ProfileScreen() {
   const height = Number(profile.heightCm);
   const bmi = latest && height > 0 ? latest.kg / ((height / 100) ** 2) : null;
   return <Page>
-    <Title eyebrow="YOUR JOURNEY" subtitle="Your details stay on this device in the first version.">Made for your goals.</Title>
+    <Title eyebrow="YOUR JOURNEY" subtitle={`Signed in as ${auth.user.email}. Your profile is saved to your account.`}>Made for your goals.</Title>
+    {store.profileSyncError ? <Card><Text style={{ color: theme.red }}>Profile changes have not synced: {store.profileSyncError}</Text><Button secondary onPress={() => store.syncProfile().catch(() => {})}>Try saving again</Button></Card> : null}
     <Card><Text style={{ color: theme.text, fontSize: 20, fontWeight: '800' }}>About you</Text>
       <Label>NAME</Label><Input value={profile.name} onChangeText={(name) => store.updateProfile({ name })} placeholder="Your name" />
       <Label>DATE OF BIRTH</Label><BirthDatePicker value={profile.dob} onChange={(dob) => store.updateProfile({ dob })} />
@@ -41,7 +44,8 @@ export default function ProfileScreen() {
     <Card style={{ backgroundColor: 'rgba(45,104,106,0.28)', borderColor: 'rgba(118,240,219,0.3)' }}><Text style={{ color: theme.accent, fontWeight: '800' }}>SUGGESTED DAILY TARGETS</Text>
       {targets ? <><Text style={{ color: theme.text, fontSize: 27, fontWeight: '800' }}>{targets.calories} kcal</Text><Text style={{ color: theme.text, fontSize: 18, fontWeight: '700' }}>{targets.protein} g protein · {targets.water} ml drinks</Text><Text style={ui.muted}>Estimated maintenance: {targets.maintenance} kcal. Goal adjustment: {profile.goal === 'lose' ? 'about −300 kcal' : profile.goal === 'gain' ? 'about +200 kcal' : 'none'}. Protein guide: {targets.proteinFactor} g/kg.</Text><Text style={ui.muted}>Water is a starting drinks target; food also supplies water. Heat, exercise, illness and medical conditions can change your needs. These are estimates, not prescriptions.</Text></> : <Text style={ui.muted}>Enter a valid birth date (age 20+), height, current weight, and equation reference to see estimates. Automatic targets are paused when special dietary care is selected or when weight loss is selected at a low BMI.</Text>}
     </Card>
-    <Card><Text style={{ color: theme.text, fontSize: 20, fontWeight: '800' }}>Preferences & care</Text><Label>ALLERGIES OR FOODS TO AVOID</Label><Input value={profile.allergies} onChangeText={(allergies) => store.updateProfile({ allergies })} placeholder="e.g. peanuts, dairy" multiline /><Label>INJURIES, PAIN OR OTHER CONCERNS</Label><Input value={profile.concerns} onChangeText={(concerns) => store.updateProfile({ concerns })} placeholder="Anything your plan should consider" multiline style={{ minHeight: 72, textAlignVertical: 'top' }} /><Text style={ui.muted}>Seek qualified guidance for injuries, symptoms, or dietary restrictions needing medical care.</Text></Card>
+    <Card><Text style={{ color: theme.text, fontSize: 20, fontWeight: '800' }}>Preferences & care</Text><Label>YOUR FITNESS PLAN OR SCHEDULE</Label><Input value={profile.fitnessPlan} onChangeText={(fitnessPlan) => store.updateProfile({ fitnessPlan })} placeholder="Your training rhythm" multiline /><Label>ALLERGIES OR FOODS TO AVOID</Label><Input value={profile.allergies} onChangeText={(allergies) => store.updateProfile({ allergies })} placeholder="e.g. peanuts, dairy" multiline /><Label>INJURIES, PAIN OR OTHER CONCERNS</Label><Input value={profile.concerns} onChangeText={(concerns) => store.updateProfile({ concerns })} placeholder="Anything your plan should consider" multiline style={{ minHeight: 72, textAlignVertical: 'top' }} /><Text style={ui.muted}>Seek qualified guidance for injuries, symptoms, or dietary restrictions needing medical care.</Text></Card>
+    <Button secondary onPress={() => auth.signOut()}>Sign out</Button>
     <Button secondary onPress={() => setShowHistory(!showHistory)}>{showHistory ? 'Hide' : 'Show'} log history</Button>
     {showHistory && <Reveal><Card><Text style={{ color: theme.text, fontSize: 20, fontWeight: '800' }}>Log history</Text>
       {store.meals.length + store.workouts.length + store.weighIns.length === 0 ? <Text style={ui.muted}>No entries yet.</Text> : null}
