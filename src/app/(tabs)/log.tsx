@@ -3,26 +3,29 @@ import { useState } from 'react';
 import { Alert, Image, Text, View } from 'react-native';
 import MealTimePicker from '@/components/MealTimePicker';
 import { Button, Card, Icon, Input, Label, MotionPressable, Page, Reveal, Row, Title, ui } from '@/components/UI';
-import { estimateMeal, MealEstimate } from '@/lib/mealEstimate';
+import type { MealEstimate } from '@/lib/mealEstimate';
+import { useAuth } from '@/lib/auth';
 import { Meal, today, useStore } from '@/lib/store';
 import { theme } from '@/lib/theme';
 
-type Mode = 'meal' | 'workout' | 'weight' | 'water';
+type Mode = 'meal' | 'workout' | 'weight' | 'water' | 'steps';
 const clockTime = () => { const date = new Date(); return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`; };
 
 export default function Log() {
   const store = useStore();
+  const auth = useAuth();
   const [mode, setMode] = useState<Mode>('meal');
   const [photo, setPhoto] = useState<string | null>(null);
   const [photoData, setPhotoData] = useState<string | null>(null);
   const [description, setDescription] = useState('');
   const [mealType, setMealType] = useState<Meal['type']>('breakfast');
   const [mealTime, setMealTime] = useState(clockTime());
+  const [workoutTime, setWorkoutTime] = useState(clockTime());
   const [estimate, setEstimate] = useState<MealEstimate | null>(null);
   const [estimating, setEstimating] = useState(false);
   const [error, setError] = useState('');
   const [name, setName] = useState(''); const [note, setNote] = useState('');
-  const [minutes, setMinutes] = useState(''); const [weight, setWeight] = useState(''); const [water, setWater] = useState('');
+  const [minutes, setMinutes] = useState(''); const [weight, setWeight] = useState(''); const [water, setWater] = useState(''); const [steps, setSteps] = useState('');
   const existing = mealType !== 'snack' ? store.meals.find((meal) => meal.date === today() && meal.type === mealType) : null;
 
   async function pickPhoto(camera: boolean) {
@@ -40,7 +43,7 @@ export default function Log() {
   async function analyze() {
     if (!description.trim() && !photoData) return setError('Describe the food or add a photo first.');
     setEstimating(true); setError(''); setEstimate(null);
-    try { setEstimate(await estimateMeal(description.trim(), photoData)); }
+    try { setEstimate(await auth.estimateMeal(description.trim(), photoData)); }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'AI estimate failed.'); }
     finally { setEstimating(false); }
   }
@@ -48,7 +51,7 @@ export default function Log() {
     if (!estimate) return;
     store.addMeal({ date: today(), time: mealTime, type: mealType, name: estimate.name, note: `${description.trim()}${estimate.assumptions ? ` · Assumptions: ${estimate.assumptions}` : ''}`, calories: estimate.calories, protein: estimate.protein, carbs: estimate.carbs, fat: estimate.fat, fibre: estimate.fibre, sugar: estimate.sugar });
     setDescription(''); setPhoto(null); setPhotoData(null); setEstimate(null); setMealTime(clockTime()); setError('');
-    Alert.alert('Meal saved', 'Your daily totals have been updated.');
+    Alert.alert('Meal saved', `Logged at ${mealTime}. Your daily totals have been updated.`);
   }
   function saveOther() {
     if (mode === 'weight') {
@@ -61,16 +64,21 @@ export default function Log() {
       if (!Number.isFinite(ml) || ml <= 0 || ml > 5000) return Alert.alert('Check water', 'Enter an amount in millilitres.');
       store.addWater(today(), ml); setWater(''); Alert.alert('Saved', 'Your water has been logged.'); return;
     }
+    if (mode === 'steps') {
+      const count = Number(steps);
+      if (!Number.isInteger(count) || count <= 0 || count > 100000) return Alert.alert('Check steps', 'Enter a valid number of steps.');
+      store.addSteps(today(), count); setSteps(''); Alert.alert('Saved', 'Your steps have been logged.'); return;
+    }
     const duration = Number(minutes);
     if (!name.trim() || !Number.isFinite(duration) || duration <= 0 || duration > 1440) return Alert.alert('Check workout', 'Enter an activity and its duration in minutes.');
-    store.addWorkout({ date: today(), name: name.trim(), minutes: duration, note: note.trim() });
-    setName(''); setNote(''); setMinutes(''); Alert.alert('Workout logged', 'Nice work showing up today.');
+    store.addWorkout({ date: today(), time: workoutTime, name: name.trim(), minutes: duration, note: note.trim() });
+    setName(''); setNote(''); setMinutes(''); setWorkoutTime(clockTime()); Alert.alert('Workout logged', 'Nice work showing up today.');
   }
 
   return <Page>
     <Title eyebrow="BUILD THE HABIT" subtitle="Capture the details that help you grow.">Log it. Keep moving.</Title>
     <View style={{ flexDirection: 'row', gap: 5, padding: 5, borderRadius: 16, backgroundColor: theme.cardAlt, borderWidth: 1, borderColor: theme.line }}>
-      {(['meal', 'workout', 'weight', 'water'] as const).map((option) =>
+      {(['meal', 'workout', 'weight', 'water', 'steps'] as const).map((option) =>
         <MotionPressable key={option} onPress={() => setMode(option)} accessibilityState={{ selected: mode === option }}
           style={{ flex: 1, minHeight: 40, borderRadius: 12, backgroundColor: mode === option ? theme.accent : 'transparent' }}>
           <Text style={{ color: mode === option ? theme.ink : theme.muted, fontWeight: '800', fontSize: 11, textTransform: 'capitalize' }}>{option}</Text>
@@ -90,8 +98,8 @@ export default function Log() {
         {existing && <Text style={{ color: theme.orange, fontSize: 12 }}>Saving another {mealType} today will replace the current entry. Snacks can be added more than once.</Text>}
         <Label>TIME</Label><MealTimePicker value={mealTime} onChange={setMealTime} />
         <Label>FOOD AND PORTION</Label>
-        <Input value={description} onChangeText={(value) => { setDescription(value); setEstimate(null); }} multiline placeholder="e.g. 2 chapatis, 1 bowl dal, paneer curry cooked with oil" style={{ minHeight: 94, textAlignVertical: 'top' }} />
-        <Text style={[ui.muted, { fontSize: 11 }]}>Include serving size, ingredients, oil or sauces for a better estimate.</Text>
+        <Input value={description} onChangeText={(value) => { setDescription(value); setEstimate(null); }} multiline placeholder="e.g. 2 chapatis (80 g), dal (150 g), paneer (100 g), oil (1 tsp)" style={{ minHeight: 94, textAlignVertical: 'top' }} />
+        <Text style={[ui.muted, { fontSize: 11 }]}>For a more accurate estimate, list each food with its weight in grams, plus oils, sauces, and drinks. If you do not know the weight, give the portion size.</Text>
         <Row><View style={{ flex: 1 }}><Button secondary onPress={() => pickPhoto(true)}>Take photo</Button></View><View style={{ flex: 1 }}><Button secondary onPress={() => pickPhoto(false)}>Choose photo</Button></View></Row>
         {photo && <Image source={{ uri: photo }} style={{ width: '100%', height: 170, borderRadius: 13 }} />}
         <Row><Icon name="camera" color={theme.accent} size={17} /><Text style={[ui.muted, { flex: 1, fontSize: 11 }]}>Photo is optional. Only the submitted photo and description go to the AI service.</Text></Row>
@@ -109,10 +117,11 @@ export default function Log() {
         <Button onPress={saveMeal}>{existing ? `Replace ${mealType}` : 'Save meal'}</Button>
       </Card></Reveal>}
     </Reveal> : <Reveal key={mode}><Card>
-      <Text style={{ color: theme.text, fontSize: 19, fontWeight: '800' }}>{mode === 'weight' ? 'Weight check-in' : mode === 'water' ? 'Hydration check-in' : 'Workout details'}</Text>
+      <Text style={{ color: theme.text, fontSize: 19, fontWeight: '800' }}>{mode === 'weight' ? 'Weight check-in' : mode === 'water' ? 'Hydration check-in' : mode === 'steps' ? 'Steps check-in' : 'Workout details'}</Text>
       {mode === 'weight' ? <><Label>WEIGHT (KG)</Label><Input value={weight} onChangeText={setWeight} keyboardType="decimal-pad" placeholder="e.g. 72.5" /></> :
         mode === 'water' ? <><Label>AMOUNT (ML)</Label><Input value={water} onChangeText={setWater} keyboardType="number-pad" placeholder="e.g. 250" /></> :
-          <><Label>ACTIVITY</Label><Input value={name} onChangeText={setName} placeholder="e.g. strength training" /><Label>EXERCISES OR NOTES</Label><Input value={note} onChangeText={setNote} multiline placeholder="e.g. squats, rows and presses" style={{ minHeight: 78, textAlignVertical: 'top' }} /><Label>DURATION (MINUTES)</Label><Input value={minutes} onChangeText={setMinutes} keyboardType="number-pad" placeholder="e.g. 45" /></>}
+        mode === 'steps' ? <><Label>STEPS</Label><Input value={steps} onChangeText={setSteps} keyboardType="number-pad" placeholder="e.g. 3200" /></> :
+          <><Label>ACTIVITY</Label><Input value={name} onChangeText={setName} placeholder="e.g. strength training" /><Label>EXERCISES OR NOTES</Label><Input value={note} onChangeText={setNote} multiline placeholder="e.g. squats, rows and presses" style={{ minHeight: 78, textAlignVertical: 'top' }} /><Label>START TIME</Label><MealTimePicker value={workoutTime} onChange={setWorkoutTime} /><Label>DURATION (MINUTES)</Label><Input value={minutes} onChangeText={setMinutes} keyboardType="number-pad" placeholder="e.g. 45" /></>}
       <Button onPress={saveOther}>Save {mode}</Button>
     </Card></Reveal>}
   </Page>;

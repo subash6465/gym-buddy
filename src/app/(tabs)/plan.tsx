@@ -1,58 +1,48 @@
+import { useState } from 'react';
 import { Text, View } from 'react-native';
-import { Card, Icon, Page, Title, ui } from '@/components/UI';
+import { Button, Card, Icon, Page, Title, ui } from '@/components/UI';
 import { useStore } from '@/lib/store';
-import { useClock } from '@/lib/clock';
-import { suggestedTargets } from '@/lib/targets';
+import { useAuth } from '@/lib/auth';
 import { theme } from '@/lib/theme';
 
-const routines = {
-  gym: [
-    ['Full body A', 'Squat or leg press · row · chest press · core'],
-    ['Move + recover', 'Comfortable walk, bike, or mobility work'],
-    ['Full body B', 'Hip hinge · pulldown · shoulder press · core'],
-  ],
-  home: [
-    ['Full body A', 'Chair squat · wall push-up · band row · core'],
-    ['Move + recover', 'Comfortable walk or gentle mobility work'],
-    ['Full body B', 'Step-up · glute bridge · incline push-up · core'],
-  ],
-};
-
 export default function Plan() {
-  const { profile, weighIns } = useStore();
-  const now = useClock();
-  const targets = suggestedTargets(profile, weighIns[0]?.kg, now);
+  const { profile } = useStore();
+  const auth = useAuth();
+  const { plan } = auth;
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState('');
   const goalLabel = { lose: 'Weight loss', gain: 'Weight gain', maintain: 'Maintenance' }[profile.goal];
   return <Page>
-    <Title eyebrow="A STEADY PATH" subtitle="A flexible starting structure for your week.">Your plan. Your pace.</Title>
-    <Card style={{ backgroundColor: 'rgba(45,104,106,0.28)', borderColor: 'rgba(118,240,219,0.3)', paddingVertical: 22 }}>
-      <Text style={{ color: theme.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.4 }}>CURRENT DIRECTION</Text>
-      <Text style={{ color: theme.text, fontSize: 27, fontWeight: '800', letterSpacing: -1.1 }}>{goalLabel}</Text>
-      <Text style={ui.muted}>{profile.setting === 'gym' ? 'Gym' : 'Home'} workouts · three movement days</Text>
-      {targets ? <Text style={{ color: theme.text, fontSize: 12, fontWeight: '700' }}>~{targets.calories} kcal daily · ~{targets.protein} g protein</Text> :
-        <Text style={ui.muted}>Add your details and a current weight in You for suggested targets.</Text>}
-    </Card>
-
-    <Text style={{ color: theme.text, fontSize: 19, fontWeight: '800' }}>Movement rhythm</Text>
-    {profile.fitnessPlan ? <Card><Text style={{ color: theme.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>YOUR SCHEDULE</Text><Text style={{ color: theme.text, fontSize: 15 }}>{profile.fitnessPlan}</Text></Card> : null}
-    {routines[profile.setting].map(([name, work], index) => <Card key={name} style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
-      <View style={{ width: 39, height: 39, borderRadius: 13, backgroundColor: 'rgba(118,240,219,0.14)', alignItems: 'center', justifyContent: 'center' }}>
-        {index === 1 ? <Icon name="water" color={theme.accent} size={20} /> : <Icon name="workout" color={theme.accent} size={20} />}
-      </View>
-      <View style={{ flex: 1 }}><Text style={{ color: theme.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>DAY {index + 1}</Text>
-        <Text style={{ color: theme.text, fontSize: 16, fontWeight: '800', marginTop: 3 }}>{name}</Text>
-        <Text style={[ui.muted, { fontSize: 12, marginTop: 2 }]}>{work}</Text></View>
-    </Card>)}
-    <Text style={ui.muted}>Choose a comfortable effort and log what you actually do.</Text>
-
-    <Text style={{ color: theme.text, fontSize: 19, fontWeight: '800' }}>Fuel the work</Text>
-    <Card>
-      <Text style={{ color: theme.text, fontSize: 15, lineHeight: 23 }}>Build meals around a protein source, vegetables or fruit, a carbohydrate source, and fats that suit your preferences. Log portions to learn what works for you.</Text>
-      <View style={{ borderTopWidth: 1, borderColor: theme.line, paddingTop: 12 }}>
-        <Text style={ui.muted}>{profile.allergies ? `Your allergy note: ${profile.allergies}. Always verify ingredients directly.` : 'Add allergies in You so they stay visible while planning.'}</Text>
-      </View>
-    </Card>
-    {profile.concerns ? <Card><Text style={{ color: theme.orange, fontWeight: '800' }}>YOUR CONCERNS</Text><Text style={ui.muted}>{profile.concerns}</Text><Text style={ui.muted}>This starter routine has not been tailored to an injury or medical condition. Get qualified advice before trying movements that cause pain.</Text></Card> : null}
-    <Card><Text style={{ color: theme.text, fontSize: 16, fontWeight: '800' }}>AI coach is next</Text><Text style={ui.muted}>The planned coach is not connected yet. This starter plan is not personalized medical or nutrition advice.</Text></Card>
+    <Title eyebrow="YOUR PERSONAL WEEK" subtitle="A starting plan built from your details and preferences.">Your plan. Your pace.</Title>
+    {plan ? <>
+      <Card style={{ backgroundColor: 'rgba(45,104,106,0.28)', borderColor: 'rgba(118,240,219,0.3)' }}>
+        <Text style={{ color: theme.accent, fontSize: 11, fontWeight: '800', letterSpacing: 1 }}>CURRENT DIRECTION</Text>
+        <Text style={{ color: theme.text, fontSize: 26, fontWeight: '800' }}>{goalLabel}</Text>
+        <Text style={ui.muted}>{plan.summary}</Text>
+        <Text style={{ color: theme.text, fontWeight: '700' }}>{plan.recommendedDays} training day{plan.recommendedDays === 1 ? '' : 's'} recommended · {plan.requestedDays} requested · {plan.pace} pace</Text>
+        <Text style={ui.muted}>{plan.guidanceNote}</Text>
+      </Card>
+      <Card><Text style={{ color: theme.text, fontSize: 19, fontWeight: '800' }}>Daily goals</Text>
+        {plan.calorieTarget ? <>
+          <Text style={{ color: theme.text, fontSize: 22, fontWeight: '800' }}>{plan.calorieTarget.toLocaleString()} kcal intake</Text>
+          <Text style={ui.muted}>Estimated maintenance {plan.maintenanceCalories.toLocaleString()} kcal · planned deficit {plan.deficitCalories.toLocaleString()} kcal</Text>
+          <Text style={ui.muted}>Protein {plan.proteinGrams} g · Drinks {plan.waterMl.toLocaleString()} ml · Steps {plan.stepsTarget.toLocaleString()}</Text>
+        </> : <Text style={ui.muted}>Personal calorie and drink goals are paused for this profile. Steps starting point: {plan.stepsTarget.toLocaleString()} per day.</Text>}
+      </Card>
+      {profile.fitnessPlan ? <Card><Text style={{ color: theme.accent, fontSize: 11, fontWeight: '800' }}>YOUR ORIGINAL PLAN</Text><Text style={ui.muted}>{profile.fitnessPlan}</Text></Card> : null}
+      <Text style={{ color: theme.text, fontSize: 19, fontWeight: '800' }}>This week</Text>
+      {plan.days.map((day) => <Card key={day.day} style={{ flexDirection: 'row', gap: 12 }}>
+        <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: theme.cardAlt, alignItems: 'center', justifyContent: 'center' }}><Icon name={day.isRest ? 'water' : 'workout'} color={theme.accent} size={20} /></View>
+        <View style={{ flex: 1, gap: 5 }}><Text style={{ color: theme.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>{day.day.toUpperCase()} · {day.isRest ? 'RECOVERY' : `${day.minutes} MIN`}</Text>
+          <Text style={{ color: theme.text, fontSize: 17, fontWeight: '800' }}>{day.title}</Text>
+          <Text style={ui.muted}>{day.focus}</Text>
+          {day.activities.map((activity, index) => <Text key={`${day.day}-${index}`} style={ui.muted}>• {activity}</Text>)}
+        </View>
+      </Card>)}
+      <Card><Text style={{ color: theme.text, fontSize: 18, fontWeight: '800' }}>Suggestions</Text><Text style={ui.muted}>{plan.suggestions}</Text><Text style={[ui.muted, { fontSize: 11 }]}>Chat with Gym Buddy AI and use “Update my plan using this chat” to revise this week.</Text></Card>
+    </> : <Card><Text style={ui.muted}>Generate a weekly plan from your saved profile and training preferences.</Text>
+      {error ? <Text accessibilityRole="alert" style={{ color: theme.red }}>{error}</Text> : null}
+      <Button disabled={generating} onPress={() => { setGenerating(true); setError(''); auth.revisePlan([{ role: 'user', content: 'Create a practical weekly plan from my saved profile and preferences.' }]).catch((cause) => setError(cause instanceof Error ? cause.message : 'Could not generate a plan.')).finally(() => setGenerating(false)); }}>{generating ? 'Building your plan…' : 'Generate my plan'}</Button>
+    </Card>}
   </Page>;
 }

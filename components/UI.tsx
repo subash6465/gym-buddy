@@ -2,7 +2,7 @@ import { Children, createContext, ReactNode, useContext, useEffect, useState } f
 import { useIsFocused } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import {
-  Animated, ColorValue, Easing, Pressable, ScrollView, StyleProp, StyleSheet,
+  Animated, ColorValue, Easing, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleProp, StyleSheet,
   Text, TextInput, TextInputProps, View, ViewStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,6 +13,8 @@ const symbolNames = {
   home: { ios: 'house.fill', android: 'home', web: 'home' },
   log: { ios: 'plus.circle.fill', android: 'add_circle', web: 'add_circle' },
   plan: { ios: 'calendar', android: 'calendar_month', web: 'calendar_month' },
+  history: { ios: 'clock.arrow.circlepath', android: 'history', web: 'history' },
+  chat: { ios: 'bubble.left.and.bubble.right.fill', android: 'chat', web: 'chat' },
   you: { ios: 'person.crop.circle', android: 'account_circle', web: 'account_circle' },
   meal: { ios: 'fork.knife', android: 'restaurant', web: 'restaurant' },
   water: { ios: 'drop.fill', android: 'water_drop', web: 'water_drop' },
@@ -45,13 +47,15 @@ export function Page({ children }: { children: ReactNode }) {
   return <SafeAreaView style={s.safe} edges={['top']}>
     <View pointerEvents="none" style={s.glowTop} />
     <View pointerEvents="none" style={s.glowSide} />
-    <PageFocusContext.Provider value={focused}>
-      <ScrollView style={s.page} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <Reveal delay={0}><Brand /></Reveal>
-        {Children.toArray(children).map((child, index) =>
-          <Reveal key={index} delay={Math.min(index * 45, 270)}>{child}</Reveal>)}
-      </ScrollView>
-    </PageFocusContext.Provider>
+    <KeyboardAvoidingView style={s.page} behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}>
+      <PageFocusContext.Provider value={focused}>
+        <ScrollView style={s.page} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={false}>
+          <Reveal delay={0}><Brand /></Reveal>
+          {Children.toArray(children).map((child, index) =>
+            <Reveal key={index} delay={Math.min(index * 45, 270)}>{child}</Reveal>)}
+        </ScrollView>
+      </PageFocusContext.Provider>
+    </KeyboardAvoidingView>
   </SafeAreaView>;
 }
 

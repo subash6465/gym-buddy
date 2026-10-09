@@ -1,4 +1,5 @@
 import type { Profile } from './store';
+import type { AiPlan } from './plan';
 
 export function ageOnDate(dob: string, now = new Date()): number | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dob);
@@ -25,4 +26,11 @@ export function suggestedTargets(profile: Profile, weightKg?: number, now = new 
   // Approximate beverage portion of adult total water adequate intake; food supplies about 20%.
   const water = profile.equation === 'male' ? 3000 : 2200;
   return { age, bmi, resting: Math.round(resting), maintenance: Math.round(maintenance), calories, protein, water, proteinFactor };
+}
+
+export function planTargets(profile: Profile, weightKg: number | undefined, plan: AiPlan | null, now = new Date()) {
+  const base = suggestedTargets(profile, weightKg, now);
+  if (!base || !plan || !plan.calorieTarget) return base;
+  return { ...base, calories: plan.calorieTarget, maintenance: plan.maintenanceCalories,
+    protein: plan.proteinGrams, water: plan.waterMl, steps: plan.stepsTarget, deficit: plan.deficitCalories };
 }
