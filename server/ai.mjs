@@ -12,10 +12,34 @@ const image = (dataUrl) => {
 const providerError = (provider, status) => {
   const reason = status === 401 ? 'The API key was rejected. Enter the correct key and verify again.' : status === 403 ? 'The key does not have access to this model. Check its permissions and verify again.'
     : status === 429 ? 'The provider rate limit or account quota was reached.'
+      : status === 503 ? 'The provider is temporarily overloaded or unavailable. Please try again shortly.'
       : status === 400 || status === 404 ? 'The provider rejected the request or the configured model is unavailable.'
         : 'The provider could not complete the request.';
   return Object.assign(new Error(`${provider} request failed (${status}). ${reason}`), { status: 502 });
 };
+
+async function sendProviderRequest(provider, url, headers, body) {
+  const deadline = Date.now() + 75_000;
+  const retryable = new Set([408, 429, 500, 502, 503, 504]);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    let response;
+    try {
+      response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body),
+        signal: AbortSignal.timeout(Math.max(1, deadline - Date.now())) });
+    } catch {
+      if (provider !== 'gemini' || attempt === 2 || Date.now() >= deadline) {
+        throw Object.assign(new Error(`${provider} is unavailable. Try again shortly.`), { status: 503 });
+      }
+    }
+    if (response?.ok) return response;
+    if (response && (provider !== 'gemini' || !retryable.has(response.status) || attempt === 2)) {
+      throw providerError(provider, response.status);
+    }
+    const pause = Math.min(1000 * 2 ** attempt + Math.floor(Math.random() * 500), Math.max(0, deadline - Date.now()));
+    if (pause) await new Promise((resolve) => setTimeout(resolve, pause));
+  }
+  throw Object.assign(new Error(`${provider} is unavailable. Try again shortly.`), { status: 503 });
+}
 
 export async function generate({ provider, apiKey, instructions, messages, imageDataUrl, jsonSchema }) {
   if (!models[provider] || !apiKey) throw Object.assign(new Error('Set up an AI provider and key when you sign in.'), { status: 409 });
@@ -45,10 +69,7 @@ export async function generate({ provider, apiKey, instructions, messages, image
         { text: message.content }, ...(index === last && photo ? [{ inlineData: { mimeType: photo.mimeType, data: photo.data } }] : []),
       ] })), ...(jsonSchema ? { generationConfig: { responseFormat: { text: { mimeType: 'application/json', schema: jsonSchema } } } } : {}) };
   }
-  let response;
-  try { response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(60_000) }); }
-  catch { throw Object.assign(new Error(`${provider} is unavailable. Try again shortly.`), { status: 503 }); }
-  if (!response.ok) throw providerError(provider, response.status);
+  const response = await sendProviderRequest(provider, url, headers, body);
   const payload = await response.json();
   const text = provider === 'openai'
     ? payload.output?.flatMap((item) => item.type === 'message' ? item.content || [] : []).filter((item) => item.type === 'output_text').map((item) => item.text).join('\n')

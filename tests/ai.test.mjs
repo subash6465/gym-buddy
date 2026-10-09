@@ -29,3 +29,34 @@ test('routes text and images to the chosen provider without exposing keys in out
     assert.equal(calls[2].body.contents[0].parts[1].inlineData.mimeType, 'image/png');
   } finally { globalThis.fetch = original; }
 });
+
+test('retries a temporary Gemini 503 and returns the next successful reply', async () => {
+  const original = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    return calls === 1 ? { ok: false, status: 503 } : {
+      ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: 'Recovered' }] } }] }),
+    };
+  };
+  try {
+    assert.equal(await generate({ provider: 'gemini', apiKey: 'private-test-key', instructions: 'Reply briefly',
+      messages: [{ role: 'user', content: 'Hello' }] }), 'Recovered');
+    assert.equal(calls, 2);
+  } finally { globalThis.fetch = original; }
+});
+
+test('does not retry a rejected Gemini API key', async () => {
+  const original = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => { calls++; return { ok: false, status: 401 }; };
+  try {
+    await assert.rejects(generate({ provider: 'gemini', apiKey: 'private-test-key', instructions: 'Reply briefly',
+      messages: [{ role: 'user', content: 'Hello' }] }), (error) => {
+      assert.match(error.message, /API key was rejected/);
+      assert.doesNotMatch(error.message, /private-test-key/);
+      return true;
+    });
+    assert.equal(calls, 1);
+  } finally { globalThis.fetch = original; }
+});
