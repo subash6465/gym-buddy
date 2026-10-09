@@ -53,3 +53,22 @@ test('plan generation sends all relevant onboarding choices to the selected prov
     assert.equal(plan.days.length, 7);
   } finally { globalThis.fetch = original; }
 });
+
+test('Gemini plan generation falls back to JSON mode when its strict schema is rejected', async () => {
+  const original = globalThis.fetch;
+  const requests = [];
+  globalThis.fetch = async (_url, options) => {
+    requests.push(JSON.parse(options.body));
+    return requests.length === 1 ? { ok: false, status: 400 } : {
+      ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(raw) }] } }] }),
+    };
+  };
+  try {
+    const plan = await createPlan(profile, { provider: 'gemini', apiKey: 'private-test-key' });
+    assert.equal(plan.days.length, 7);
+    assert.ok(requests[0].generationConfig.responseFormat.text.schema);
+    assert.equal(requests[1].generationConfig.responseMimeType, 'application/json');
+    assert.equal(requests[1].generationConfig.responseFormat, undefined);
+    assert.match(requests[1].systemInstruction.parts[0].text, /recommendedDays/);
+  } finally { globalThis.fetch = original; }
+});

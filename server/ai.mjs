@@ -9,13 +9,18 @@ const image = (dataUrl) => {
   if (!match) throw Object.assign(new Error('Unsupported meal photo.'), { status: 400 });
   return { mimeType: match[1], data: match[2] };
 };
-const providerError = (provider, status) => {
+const providerError = async (provider, response, headers) => {
+  const status = response.status;
+  const payload = provider === 'gemini' && status === 400 ? await response.json?.().catch(() => null) : null;
+  const key = headers['x-goog-api-key'];
+  const detail = typeof payload?.error?.message === 'string'
+    ? payload.error.message.replaceAll(key, '[redacted]').replace(/\s+/g, ' ').slice(0, 240) : '';
   const reason = status === 401 ? 'The API key was rejected. Enter the correct key and verify again.' : status === 403 ? 'The key does not have access to this model. Check its permissions and verify again.'
     : status === 429 ? 'The provider rate limit or account quota was reached.'
       : status === 503 ? 'The provider is temporarily overloaded or unavailable. Please try again shortly.'
-      : status === 400 || status === 404 ? 'The provider rejected the request or the configured model is unavailable.'
+      : status === 400 || status === 404 ? detail || 'The provider rejected the request or the configured model is unavailable.'
         : 'The provider could not complete the request.';
-  return Object.assign(new Error(`${provider} request failed (${status}). ${reason}`), { status: 502 });
+  return Object.assign(new Error(`${provider} request failed (${status}). ${reason}`), { status: 502, providerStatus: status });
 };
 
 async function sendProviderRequest(provider, url, headers, body) {
@@ -33,7 +38,7 @@ async function sendProviderRequest(provider, url, headers, body) {
     }
     if (response?.ok) return response;
     if (response && (provider !== 'gemini' || !retryable.has(response.status) || attempt === 2)) {
-      throw providerError(provider, response.status);
+      throw await providerError(provider, response, headers);
     }
     const pause = Math.min(1000 * 2 ** attempt + Math.floor(Math.random() * 500), Math.max(0, deadline - Date.now()));
     if (pause) await new Promise((resolve) => setTimeout(resolve, pause));
@@ -69,7 +74,16 @@ export async function generate({ provider, apiKey, instructions, messages, image
         { text: message.content }, ...(index === last && photo ? [{ inlineData: { mimeType: photo.mimeType, data: photo.data } }] : []),
       ] })), ...(jsonSchema ? { generationConfig: { responseFormat: { text: { mimeType: 'application/json', schema: jsonSchema } } } } : {}) };
   }
-  const response = await sendProviderRequest(provider, url, headers, body);
+  let response;
+  try {
+    response = await sendProviderRequest(provider, url, headers, body);
+  } catch (error) {
+    if (provider !== 'gemini' || !jsonSchema || error.providerStatus !== 400) throw error;
+    const fallbackBody = { ...body,
+      systemInstruction: { parts: [{ text: `${instructions}\nReturn only a JSON object matching this schema: ${JSON.stringify(jsonSchema)}` }] },
+      generationConfig: { responseMimeType: 'application/json' } };
+    response = await sendProviderRequest(provider, url, headers, fallbackBody);
+  }
   const payload = await response.json();
   const text = provider === 'openai'
     ? payload.output?.flatMap((item) => item.type === 'message' ? item.content || [] : []).filter((item) => item.type === 'output_text').map((item) => item.text).join('\n')
