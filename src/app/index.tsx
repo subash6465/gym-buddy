@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Platform, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Keyboard, Platform, Pressable, Text, View } from 'react-native';
 import { Button, Card, Input, Label, Page, Title, ui } from '@/components/UI';
 import { useAuth } from '@/lib/auth';
 import type { AiProvider } from '@/lib/auth';
@@ -46,8 +46,7 @@ export default function Welcome() {
     catch (cause) { showError(cause instanceof Error ? cause.message : 'Could not sign in.'); }
     finally { setBusy(false); }
   };
-  return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-    <Page>
+  return <Page>
       <Title eyebrow="YOUR STRONGER START" subtitle="A simple place to plan, move, and keep track of what matters to you.">Make progress feel personal.</Title>
       <View style={{ flexDirection: 'row', gap: 10 }}>
         {['Build your plan', 'Track each day', 'Find your rhythm'].map((item, index) => <View key={item} style={{ flex: 1, minHeight: 75, borderRadius: 16, padding: 11, backgroundColor: index === 0 ? 'rgba(118,240,219,.16)' : theme.cardAlt, borderWidth: 1, borderColor: theme.line }}><Text style={{ color: theme.accent, fontSize: 11, fontWeight: '800' }}>0{index + 1}</Text><Text style={{ color: theme.text, fontSize: 12, fontWeight: '700', marginTop: 7 }}>{item}</Text></View>)}
@@ -70,6 +69,5 @@ export default function Welcome() {
         <Button secondary onPress={() => { if (step === 'ai') { setStep('account'); setApiKey(''); } else setCreate(!create); setError(''); }}>{step === 'ai' ? 'Back to account details' : create ? 'Already have an account? Sign in' : 'New here? Create an account'}</Button>
       </Card>
       <Text style={[ui.muted, { textAlign: 'center' }]}>Your health details are saved to your account after setup. Use a trusted connection when signing in.</Text>
-    </Page>
-  </KeyboardAvoidingView>;
+  </Page>;
 }

@@ -51,7 +51,7 @@ export default function Log() {
     if (!estimate) return;
     store.addMeal({ date: today(), time: mealTime, type: mealType, name: estimate.name, note: `${description.trim()}${estimate.assumptions ? ` · Assumptions: ${estimate.assumptions}` : ''}`, calories: estimate.calories, protein: estimate.protein, carbs: estimate.carbs, fat: estimate.fat, fibre: estimate.fibre, sugar: estimate.sugar });
     setDescription(''); setPhoto(null); setPhotoData(null); setEstimate(null); setMealTime(clockTime()); setError('');
-    Alert.alert('Meal saved', 'Your daily totals have been updated.');
+    Alert.alert('Meal saved', `Logged at ${mealTime}. Your daily totals have been updated.`);
   }
   function saveOther() {
     if (mode === 'weight') {
@@ -98,8 +98,8 @@ export default function Log() {
         {existing && <Text style={{ color: theme.orange, fontSize: 12 }}>Saving another {mealType} today will replace the current entry. Snacks can be added more than once.</Text>}
         <Label>TIME</Label><MealTimePicker value={mealTime} onChange={setMealTime} />
         <Label>FOOD AND PORTION</Label>
-        <Input value={description} onChangeText={(value) => { setDescription(value); setEstimate(null); }} multiline placeholder="e.g. 2 chapatis, 1 bowl dal, paneer curry cooked with oil" style={{ minHeight: 94, textAlignVertical: 'top' }} />
-        <Text style={[ui.muted, { fontSize: 11 }]}>Include serving size, ingredients, oil or sauces for a better estimate.</Text>
+        <Input value={description} onChangeText={(value) => { setDescription(value); setEstimate(null); }} multiline placeholder="e.g. 2 chapatis (80 g), dal (150 g), paneer (100 g), oil (1 tsp)" style={{ minHeight: 94, textAlignVertical: 'top' }} />
+        <Text style={[ui.muted, { fontSize: 11 }]}>For a more accurate estimate, list each food with its weight in grams, plus oils, sauces, and drinks. If you do not know the weight, give the portion size.</Text>
         <Row><View style={{ flex: 1 }}><Button secondary onPress={() => pickPhoto(true)}>Take photo</Button></View><View style={{ flex: 1 }}><Button secondary onPress={() => pickPhoto(false)}>Choose photo</Button></View></Row>
         {photo && <Image source={{ uri: photo }} style={{ width: '100%', height: 170, borderRadius: 13 }} />}
         <Row><Icon name="camera" color={theme.accent} size={17} /><Text style={[ui.muted, { flex: 1, fontSize: 11 }]}>Photo is optional. Only the submitted photo and description go to the AI service.</Text></Row>

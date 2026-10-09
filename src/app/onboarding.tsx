@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Platform, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Keyboard, Platform, Pressable, Text, View } from 'react-native';
 import BirthDatePicker from '@/components/BirthDatePicker';
 import { Button, Card, Input, Label, Page, Title, ui } from '@/components/UI';
 import { useAuth } from '@/lib/auth';
@@ -41,7 +41,7 @@ export default function Onboarding() {
     catch (cause) { showError(cause instanceof Error ? cause.message : 'Could not save your details.'); }
     finally { setBusy(false); }
   };
-  return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}><Page key={step}>
+  return <Page key={step}>
     <View style={{ flexDirection: 'row', gap: 7 }}>{[0, 1, 2].map((index) => <View key={index} style={{ flex: 1, height: 5, borderRadius: 5, backgroundColor: index <= step ? theme.accent : theme.line }} />)}</View>
     <Title eyebrow={`SETUP · ${step + 1} OF 3`} subtitle={['The basics help us shape useful starting targets.', 'Choose the direction and training style that fits your life.', 'Share anything your plan should take into account.'][step]}>{['First, about you.', 'Your way to move.', 'Care that counts.'][step]}</Title>
     {step === 0 ? <Card>
@@ -75,5 +75,5 @@ export default function Onboarding() {
     {busy ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}><ActivityIndicator color={theme.accent} /><Text style={ui.muted}>Reviewing your details and building your weekly plan…</Text></View> : null}
     <Button onPress={next} disabled={busy}>{busy ? 'Building your plan…' : step === 2 ? 'Generate my plan' : 'Continue'}</Button>
     {step > 0 ? <Button secondary onPress={() => { if (!busy) { setError(''); setStep(step - 1); } }}>Back</Button> : <Button secondary onPress={() => { void auth.signOut(); }}>Sign out</Button>}
-  </Page></KeyboardAvoidingView>;
+  </Page>;
 }
