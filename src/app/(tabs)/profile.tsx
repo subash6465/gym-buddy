@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Alert, Platform, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, Text, View } from 'react-native';
 import BirthDatePicker from '@/components/BirthDatePicker';
 import { Button, Card, Input, Label, MotionPressable, Page, Reveal, Row, Title, ui } from '@/components/UI';
 import { Goal, useStore } from '@/lib/store';
-import { ageOnDate, suggestedTargets } from '@/lib/targets';
+import { ageOnDate, planTargets } from '@/lib/targets';
 import { useClock } from '@/lib/clock';
 import { theme } from '@/lib/theme';
 import { AiProvider, useAuth } from '@/lib/auth';
@@ -21,11 +21,21 @@ export default function ProfileScreen() {
   const [aiProvider, setAiProvider] = useState<AiProvider>(auth.ai.provider || 'openai');
   const [aiKey, setAiKey] = useState('');
   const [aiBusy, setAiBusy] = useState(false);
+  const [aiVerifying, setAiVerifying] = useState(false);
+  const [aiTicket, setAiTicket] = useState('');
+  const [aiVerifiedKey, setAiVerifiedKey] = useState('');
   const [aiMessage, setAiMessage] = useState('');
+  const verifyAi = async () => {
+    if (aiVerifying) return;
+    setAiMessage(''); setAiTicket(''); setAiVerifying(true);
+    try { setAiTicket(await auth.verifyAiKey(aiProvider, aiKey.trim())); setAiVerifiedKey(`${aiProvider}:${aiKey.trim()}`); setAiMessage('API key verified.'); }
+    catch (error) { setAiMessage(error instanceof Error ? error.message : 'Could not verify this key.'); }
+    finally { setAiVerifying(false); }
+  };
   const saveAi = async () => {
-    if (aiBusy) return;
+    if (aiBusy || !aiTicket || aiVerifiedKey !== `${aiProvider}:${aiKey.trim()}`) return;
     setAiBusy(true); setAiMessage('');
-    try { await auth.saveAiConfig(aiProvider, aiKey.trim()); setAiKey(''); setAiMessage('AI provider saved.'); }
+    try { await auth.saveAiConfig(aiProvider, aiKey.trim(), aiTicket); setAiKey(''); setAiTicket(''); setAiMessage('AI provider saved.'); }
     catch (error) { setAiMessage(error instanceof Error ? error.message : 'Could not save AI provider.'); }
     finally { setAiBusy(false); }
   };
@@ -44,7 +54,7 @@ export default function ProfileScreen() {
   const now = useClock();
   const latest = store.weighIns[0];
   const age = ageOnDate(profile.dob, now);
-  const targets = suggestedTargets(profile, latest?.kg, now);
+  const targets = planTargets(profile, latest?.kg, auth.plan, now);
   const height = Number(profile.heightCm);
   const bmi = latest && height > 0 ? latest.kg / ((height / 100) ** 2) : null;
   return <Page>
@@ -72,10 +82,11 @@ export default function ProfileScreen() {
     <Card><Text style={{ color: theme.text, fontSize: 20, fontWeight: '800' }}>Preferences & care</Text><Label>YOUR FITNESS PLAN OR SCHEDULE</Label><Input value={profile.fitnessPlan} onChangeText={(fitnessPlan) => store.updateProfile({ fitnessPlan })} placeholder="Your training rhythm" multiline /><Label>ALLERGIES OR FOODS TO AVOID</Label><Input value={profile.allergies} onChangeText={(allergies) => store.updateProfile({ allergies })} placeholder="e.g. peanuts, dairy" multiline /><Label>INJURIES, PAIN OR OTHER CONCERNS</Label><Input value={profile.concerns} onChangeText={(concerns) => store.updateProfile({ concerns })} placeholder="Anything your plan should consider" multiline style={{ minHeight: 72, textAlignVertical: 'top' }} /><Text style={ui.muted}>Seek qualified guidance for injuries, symptoms, or dietary restrictions needing medical care.</Text></Card>
     <Card><Text style={{ color: theme.text, fontSize: 20, fontWeight: '800' }}>AI provider</Text>
       <Text style={ui.muted}>Current: {auth.ai.configured ? auth.ai.provider?.toUpperCase() : 'Not configured'}. A new key replaces the saved key for this account.</Text>
-      <View style={{ flexDirection: 'row', gap: 8 }}>{([['openai', 'OpenAI'], ['claude', 'Claude'], ['gemini', 'Gemini']] as const).map(([value, label]) => <Pressable key={value} onPress={() => { setAiProvider(value); setAiKey(''); }} accessibilityRole="button" accessibilityState={{ selected: aiProvider === value }} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 42, borderRadius: 12, backgroundColor: aiProvider === value ? theme.accent : theme.cardAlt }}><Text style={{ color: aiProvider === value ? theme.ink : theme.text, fontWeight: '800' }}>{label}</Text></Pressable>)}</View>
-      <Label>NEW API KEY</Label><Input value={aiKey} onChangeText={setAiKey} secureTextEntry autoCapitalize="none" autoCorrect={false} placeholder="Paste a new API key" />
+      <View style={{ flexDirection: 'row', gap: 8 }}>{([['openai', 'OpenAI'], ['claude', 'Claude'], ['gemini', 'Gemini']] as const).map(([value, label]) => <Pressable key={value} disabled={aiVerifying} onPress={() => { setAiProvider(value); setAiKey(''); setAiTicket(''); }} accessibilityRole="button" accessibilityState={{ selected: aiProvider === value }} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 42, borderRadius: 12, backgroundColor: aiProvider === value ? theme.accent : theme.cardAlt }}><Text style={{ color: aiProvider === value ? theme.ink : theme.text, fontWeight: '800' }}>{label}</Text></Pressable>)}</View>
+      <Label>NEW API KEY</Label><Input value={aiKey} editable={!aiVerifying} onChangeText={(value) => { setAiKey(value); setAiTicket(''); }} secureTextEntry autoCapitalize="none" autoCorrect={false} placeholder="Paste a new API key" />
+      <Pressable onPress={() => { void verifyAi(); }} disabled={aiVerifying || aiBusy || aiKey.trim().length < 10} accessibilityRole="button" style={{ minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.cardAlt }}><View style={{ flexDirection: 'row', gap: 8 }}>{aiVerifying ? <ActivityIndicator color={theme.accent} /> : null}<Text style={{ color: theme.accent, fontWeight: '800' }}>{aiVerifying ? 'Verifying…' : aiTicket ? 'Verified ✓' : 'Verify API key'}</Text></View></Pressable>
       {aiMessage ? <Text accessibilityRole="alert" style={{ color: aiMessage === 'AI provider saved.' ? theme.accent : theme.red }}>{aiMessage}</Text> : null}
-      <Button disabled={aiBusy || aiKey.trim().length < 10} onPress={() => { void saveAi(); }}>{aiBusy ? 'Saving…' : 'Save AI provider'}</Button>
+      <Button disabled={aiBusy || aiVerifying || !aiTicket} onPress={() => { void saveAi(); }}>{aiBusy ? 'Saving…' : 'Save AI provider'}</Button>
     </Card>
     <Button secondary onPress={() => auth.signOut()}>Sign out</Button>
     <Card><Text style={{ color: theme.text, fontSize: 18, fontWeight: '800' }}>Delete account</Text>

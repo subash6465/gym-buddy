@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Card, Page, Row, Title, ui } from '@/components/UI';
 import { today, useStore } from '@/lib/store';
-import { suggestedTargets } from '@/lib/targets';
+import { planTargets } from '@/lib/targets';
+import { useAuth } from '@/lib/auth';
 import { theme } from '@/lib/theme';
 
 const number = (value: number) => Math.round(value).toLocaleString();
@@ -13,6 +14,7 @@ type Event = { id: string; time?: string; title: string; detail: string; kind: s
 
 export default function History() {
   const store = useStore();
+  const auth = useAuth();
   const [selected, setSelected] = useState(today());
   const dates = useMemo(() => [...new Set([
     today(), ...store.meals.map((x) => x.date), ...store.workouts.map((x) => x.date),
@@ -29,7 +31,7 @@ export default function History() {
   const stepCount = steps.reduce((sum, entry) => sum + entry.count, 0);
   const exerciseMinutes = workouts.reduce((sum, workout) => sum + workout.minutes, 0);
   const weight = store.weighIns.find((x) => x.date <= selected)?.kg;
-  const targets = suggestedTargets(store.profile, weight, new Date(`${selected}T12:00:00`));
+  const targets = planTargets(store.profile, weight, auth.plan, new Date(`${selected}T12:00:00`));
   const events: Event[] = ([
     ...meals.map((x) => ({ id: x.id, time: x.time, kind: x.type.toUpperCase(), title: x.name, detail: `${number(x.calories)} kcal · Protein ${number(x.protein)} g · Carbs ${number(x.carbs)} g · Fat ${number(x.fat)} g\nFibre ${number(x.fibre)} g · Sugar ${number(x.sugar)} g${x.note ? `\n${x.note}` : ''}` })),
     ...workouts.map((x) => ({ id: x.id, time: x.time, kind: 'WORKOUT', title: x.name, detail: `${number(x.minutes)} min${x.note ? ` · ${x.note}` : ''}` })),

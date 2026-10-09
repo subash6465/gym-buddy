@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Keyboard, KeyboardAvoidingView, Platform, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Platform, Pressable, Text, View } from 'react-native';
 import BirthDatePicker from '@/components/BirthDatePicker';
 import { Button, Card, Input, Label, Page, Title, ui } from '@/components/UI';
 import { useAuth } from '@/lib/auth';
@@ -7,7 +7,7 @@ import { Profile, useStore } from '@/lib/store';
 import { ageOnDate } from '@/lib/targets';
 import { theme } from '@/lib/theme';
 
-function Choice<T extends string>({ options, value, onChange }: { options: readonly (readonly [T, string])[]; value: T; onChange: (value: T) => void }) {
+function Choice<T extends string | number>({ options, value, onChange }: { options: readonly (readonly [T, string])[]; value: T; onChange: (value: T) => void }) {
   return <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{options.map(([key, label]) =>
     <Pressable key={key} onPress={() => onChange(key)} accessibilityRole="button" accessibilityState={{ selected: value === key }} style={{ paddingHorizontal: 14, paddingVertical: 11, borderRadius: 12, backgroundColor: value === key ? theme.accent : theme.cardAlt, borderWidth: 1, borderColor: value === key ? theme.accent : theme.line }}><Text style={{ color: value === key ? theme.ink : theme.text, fontWeight: '800' }}>{label}</Text></Pressable>)}</View>;
 }
@@ -55,8 +55,13 @@ export default function Onboarding() {
       <Label>YOUR MAIN GOAL</Label><Choice options={[["lose", "Lose weight"], ["gain", "Gain weight"], ["maintain", "Maintain"]] as const} value={profile.goal} onChange={(value) => set('goal', value)} />
       <Label>WHERE YOU TRAIN</Label><Choice options={[["gym", "Gym"], ["home", "Home"]] as const} value={profile.setting} onChange={(value) => set('setting', value)} />
       <Label>USUAL ACTIVITY</Label><Choice options={[["sedentary", "Mostly seated"], ["light", "Light"], ["moderate", "Moderate"], ["high", "Very active"]] as const} value={profile.activity} onChange={(value) => set('activity', value)} />
+      <Label>HOW MANY DAYS CAN YOU TRAIN EACH WEEK?</Label>
+      <Choice options={([1, 2, 3, 4, 5, 6, 7] as const).map((day) => [day, `${day}`] as const)} value={profile.daysPerWeek} onChange={(value) => set('daysPerWeek', value)} />
+      <Text style={ui.muted}>We may recommend fewer hard sessions and include recovery days.</Text>
+      <Label>PREFERRED PACE</Label><Choice options={[["light", "Light"], ["moderate", "Moderate"], ["aggressive", "Aggressive"]] as const} value={profile.pace} onChange={(value) => set('pace', value)} />
+      <Text style={ui.muted}>Aggressive means a stronger, still bounded starting plan. It does not override health or recovery limits.</Text>
       <Label>YOUR FITNESS PLAN OR SCHEDULE</Label><Input value={profile.fitnessPlan} onChangeText={(value) => set('fitnessPlan', value)} placeholder="e.g. strength 3 days, walks on weekends" multiline style={{ minHeight: 76, textAlignVertical: 'top' }} />
-      <Text style={ui.muted}>The starter plan uses your goal and training location. Your own schedule stays in your profile.</Text>
+      <Text style={ui.muted}>If you have a plan, describe its days and exercises. AI will organize it into a week. Leave blank to generate one.</Text>
     </Card> : null}
     {step === 2 ? <Card>
       <Label>ALLERGIES OR FOODS TO AVOID</Label><Input value={profile.allergies} onChangeText={(value) => set('allergies', value)} placeholder="Enter details, or leave blank" multiline />
@@ -67,7 +72,8 @@ export default function Onboarding() {
       <Text style={ui.muted}>Automatic nutrition targets pause when special dietary care is selected. This plan does not diagnose or treat injuries or allergies.</Text>
     </Card> : null}
     {error ? <Text accessibilityRole="alert" style={{ color: theme.red }}>{error}</Text> : null}
-    <Button onPress={next} disabled={busy}>{busy ? 'Saving…' : step === 2 ? 'Save and open dashboard' : 'Continue'}</Button>
+    {busy ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}><ActivityIndicator color={theme.accent} /><Text style={ui.muted}>Reviewing your details and building your weekly plan…</Text></View> : null}
+    <Button onPress={next} disabled={busy}>{busy ? 'Building your plan…' : step === 2 ? 'Generate my plan' : 'Continue'}</Button>
     {step > 0 ? <Button secondary onPress={() => { if (!busy) { setError(''); setStep(step - 1); } }}>Back</Button> : <Button secondary onPress={() => { void auth.signOut(); }}>Sign out</Button>}
   </Page></KeyboardAvoidingView>;
 }

@@ -11,7 +11,8 @@ db.exec(`PRAGMA journal_mode = WAL;
   CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, salt TEXT NOT NULL, password_hash TEXT NOT NULL, created_at TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires_at TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS profiles (user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, details TEXT NOT NULL, completed_at TEXT NOT NULL, updated_at TEXT NOT NULL);
-  CREATE TABLE IF NOT EXISTS ai_configs (user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, provider TEXT NOT NULL, encrypted_key TEXT NOT NULL, updated_at TEXT NOT NULL);`);
+  CREATE TABLE IF NOT EXISTS ai_configs (user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, provider TEXT NOT NULL, encrypted_key TEXT NOT NULL, updated_at TEXT NOT NULL);
+  CREATE TABLE IF NOT EXISTS plans (user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, details TEXT NOT NULL, updated_at TEXT NOT NULL);`);
 
 function encryptionKey() {
   if (process.env.AI_KEY_ENCRYPTION_SECRET) return createHash('sha256').update(process.env.AI_KEY_ENCRYPTION_SECRET).digest();
@@ -58,10 +59,14 @@ const issueSession = (user) => {
   const token = randomBytes(32).toString('hex');
   db.prepare('INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)')
     .run(hash(token), user.id, new Date(Date.now() + 90 * 86400_000).toISOString());
-  return { token, user: publicUser(user), profile: getProfile(user.id), ai: publicAi(user.id) };
+  return { token, user: publicUser(user), profile: getProfile(user.id), ai: publicAi(user.id), plan: getPlan(user.id) };
 };
 const getProfile = (userId) => {
   const row = db.prepare('SELECT details FROM profiles WHERE user_id = ?').get(userId);
+  return row ? { daysPerWeek: 3, pace: 'moderate', ...JSON.parse(row.details) } : null;
+};
+const getPlan = (userId) => {
+  const row = db.prepare('SELECT details FROM plans WHERE user_id = ?').get(userId);
   return row ? JSON.parse(row.details) : null;
 };
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
@@ -101,7 +106,7 @@ export function currentUser(authorization) {
 
 export function getAccount(authorization) {
   const user = currentUser(authorization);
-  return { user: publicUser(user), profile: getProfile(user.id), ai: publicAi(user.id) };
+  return { user: publicUser(user), profile: getProfile(user.id), ai: publicAi(user.id), plan: getPlan(user.id) };
 }
 
 export function getAiConfig(authorization) {
@@ -121,9 +126,10 @@ const choices = {
   goal: ['lose', 'gain', 'maintain'], setting: ['gym', 'home'],
   activity: ['sedentary', 'light', 'moderate', 'high'], equation: ['', 'female', 'male'],
 };
-export function saveProfile(authorization, profile) {
-  const user = currentUser(authorization);
+export function validateProfile(profile) {
   if (!profile || typeof profile !== 'object' || Array.isArray(profile)) fail('Invalid profile.');
+  profile.daysPerWeek ??= 3;
+  profile.pace ??= 'moderate';
   for (const field of ['name', 'dob', 'heightCm', 'allergies', 'concerns', 'fitnessPlan']) {
     if (typeof profile[field] !== 'string' || profile[field].length > 2000) fail(`Invalid ${field}.`);
   }
@@ -135,11 +141,41 @@ export function saveProfile(authorization, profile) {
   if (!Number.isFinite(profile.weightKg) || profile.weightKg < 25 || profile.weightKg > 400) fail('Enter a weight between 25 and 400 kg.');
   for (const [field, allowed] of Object.entries(choices)) if (!allowed.includes(profile[field])) fail(`Invalid ${field}.`);
   if (typeof profile.nutritionCaution !== 'boolean') fail('Invalid special dietary care selection.');
+  if (!Number.isInteger(profile.daysPerWeek) || profile.daysPerWeek < 1 || profile.daysPerWeek > 7) fail('Choose 1 to 7 training days per week.');
+  if (!['light', 'moderate', 'aggressive'].includes(profile.pace)) fail('Choose a training pace.');
+}
+export function saveProfile(authorization, profile) {
+  const user = currentUser(authorization);
+  validateProfile(profile);
   const now = new Date().toISOString();
   db.prepare(`INSERT INTO profiles (user_id, details, completed_at, updated_at) VALUES (?, ?, ?, ?)
     ON CONFLICT(user_id) DO UPDATE SET details = excluded.details, updated_at = excluded.updated_at`)
     .run(user.id, JSON.stringify(profile), now, now);
   return { profile: getProfile(user.id) };
+}
+
+export function saveOnboarding(authorization, profile, plan) {
+  const user = currentUser(authorization);
+  validateProfile(profile);
+  if (!plan || !Array.isArray(plan.days) || plan.days.length !== 7) fail('Invalid generated plan.');
+  const now = new Date().toISOString();
+  db.exec('BEGIN');
+  try {
+    db.prepare(`INSERT INTO profiles (user_id, details, completed_at, updated_at) VALUES (?, ?, ?, ?)
+      ON CONFLICT(user_id) DO UPDATE SET details = excluded.details, updated_at = excluded.updated_at`).run(user.id, JSON.stringify(profile), now, now);
+    db.prepare(`INSERT INTO plans (user_id, details, updated_at) VALUES (?, ?, ?)
+      ON CONFLICT(user_id) DO UPDATE SET details = excluded.details, updated_at = excluded.updated_at`).run(user.id, JSON.stringify(plan), now);
+    db.exec('COMMIT');
+  } catch (error) { db.exec('ROLLBACK'); throw error; }
+  return { profile: getProfile(user.id), plan: getPlan(user.id) };
+}
+
+export function savePlan(authorization, plan) {
+  const user = currentUser(authorization);
+  if (!plan || !Array.isArray(plan.days) || plan.days.length !== 7) fail('Invalid generated plan.');
+  db.prepare(`INSERT INTO plans (user_id, details, updated_at) VALUES (?, ?, ?)
+    ON CONFLICT(user_id) DO UPDATE SET details = excluded.details, updated_at = excluded.updated_at`).run(user.id, JSON.stringify(plan), new Date().toISOString());
+  return { plan: getPlan(user.id) };
 }
 
 export function logout(authorization) {

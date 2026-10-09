@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@/components/UI';
 import { useAuth } from '@/lib/auth';
 import { today, useStore } from '@/lib/store';
-import { suggestedTargets } from '@/lib/targets';
+import { planTargets } from '@/lib/targets';
 import { theme } from '@/lib/theme';
 
 type Message = { role: 'user' | 'assistant'; content: string };
@@ -16,6 +16,8 @@ export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
+  const [revising, setRevising] = useState(false);
+  const [planMessage, setPlanMessage] = useState('');
   const [error, setError] = useState('');
   const scroll = useRef<ScrollView>(null);
   const send = async () => {
@@ -26,13 +28,14 @@ export default function Chat() {
     const date = today();
     const meals = store.meals.filter((x) => x.date === date);
     const workouts = store.workouts.filter((x) => x.date === date);
-    const targets = suggestedTargets(store.profile, store.weighIns[0]?.kg);
+    const targets = planTargets(store.profile, store.weighIns[0]?.kg, auth.plan);
     const context = JSON.stringify({ date, goal: store.profile.goal, workoutLocation: store.profile.setting,
       fitnessPlan: store.profile.fitnessPlan, allergies: store.profile.allergies, concerns: store.profile.concerns,
       todaysMeals: meals.map((x) => ({ name: x.name, calories: x.calories, protein: x.protein })),
       todaysWorkouts: workouts.map((x) => ({ name: x.name, minutes: x.minutes })),
       waterMl: store.water[date] || 0, steps: store.stepEntries.filter((x) => x.date === date).reduce((sum, x) => sum + x.count, 0),
-      calorieGuide: targets?.calories, proteinGuide: targets?.protein });
+      calorieGuide: targets?.calories, proteinGuide: targets?.protein, stepsGuide: auth.plan?.stepsTarget,
+      weeklyPlan: auth.plan?.days.map((day) => ({ day: day.day, title: day.title, activities: day.activities })) });
     try { setMessages([...next, { role: 'assistant', content: await auth.chat(next.slice(-20), context.slice(0, 3000)) }]); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Chat is unavailable.'); }
     finally { setBusy(false); }
@@ -49,6 +52,14 @@ export default function Chat() {
         {busy ? <Text style={{ color: theme.muted }}>Thinking…</Text> : null}
         {error ? <Text accessibilityRole="alert" style={{ color: theme.red }}>{error}</Text> : null}
       </ScrollView>
+      {messages.some((message) => message.role === 'user') ? <Pressable onPress={async () => {
+        if (revising || busy) return;
+        setRevising(true); setPlanMessage('');
+        try { await auth.revisePlan(messages.slice(-12)); setPlanMessage('Your weekly plan was updated. Open the Plan tab to review it.'); }
+        catch (cause) { setPlanMessage(cause instanceof Error ? cause.message : 'Could not update your plan.'); }
+        finally { setRevising(false); }
+      }} disabled={revising || busy} accessibilityRole="button" style={{ marginHorizontal: 12, marginBottom: 5, padding: 11, borderRadius: 12, backgroundColor: theme.cardAlt, alignItems: 'center', opacity: revising || busy ? .5 : 1 }}><Text style={{ color: theme.accent, fontWeight: '800' }}>{revising ? 'Updating your plan…' : 'Update my plan using this chat'}</Text></Pressable> : null}
+      {planMessage ? <Text accessibilityRole="alert" style={{ color: theme.accent, paddingHorizontal: 16, paddingBottom: 5 }}>{planMessage}</Text> : null}
       <View style={{ flexDirection: 'row', padding: 12, gap: 8, borderTopWidth: 1, borderColor: theme.line, alignItems: 'flex-end' }}>
         <TextInput value={draft} onChangeText={setDraft} placeholder="Ask anything about your progress…" placeholderTextColor={theme.muted} multiline maxLength={2000} style={{ flex: 1, maxHeight: 110, minHeight: 48, borderRadius: 15, backgroundColor: theme.cardAlt, color: theme.text, paddingHorizontal: 14, paddingVertical: 12 }} />
         <Pressable onPress={() => { void send(); }} disabled={busy || !draft.trim()} accessibilityRole="button" accessibilityLabel="Send message" style={{ backgroundColor: theme.accent, borderRadius: 14, minHeight: 48, paddingHorizontal: 16, justifyContent: 'center', opacity: busy || !draft.trim() ? .5 : 1 }}><Text style={{ color: theme.ink, fontWeight: '800' }}>Send</Text></Pressable>

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 process.env.DATABASE_PATH = ':memory:';
-const { register, login, getAccount, getAiConfig, saveAiConfig, saveProfile, logout, deleteAccount } = await import('../server/accounts.mjs');
+const { register, login, getAccount, getAiConfig, saveAiConfig, saveOnboarding, saveProfile, logout, deleteAccount } = await import('../server/accounts.mjs');
 
 test('account setup persists profile and sessions are isolated', () => {
   const first = register(' First@Example.com ', 'a-long-password');
@@ -50,4 +50,15 @@ test('AI keys stay private, follow the account, and can be replaced', () => {
   assert.deepEqual(getAiConfig(`Bearer ${first.token}`), { provider: 'claude', apiKey: 'replacement-secret' });
   assert.deepEqual(login('ai-one@example.com', 'a-long-password').ai, { provider: 'claude', configured: true });
   assert.throws(() => saveAiConfig(`Bearer ${second.token}`, 'other', 'wrong-secret'), { status: 400 });
+});
+
+test('onboarding saves profile and weekly plan to the same account', () => {
+  const account = register('plan@example.com', 'a-long-password');
+  const profile = { name: 'Sam', dob: '1992-03-03', heightCm: '175', weightKg: 75,
+    goal: 'maintain', setting: 'home', activity: 'light', equation: 'male', nutritionCaution: false,
+    allergies: '', concerns: '', fitnessPlan: '', daysPerWeek: 3, pace: 'moderate' };
+  const plan = { days: Array.from({ length: 7 }, (_, index) => ({ day: index, title: 'Walk' })) };
+  saveOnboarding(`Bearer ${account.token}`, profile, plan);
+  assert.deepEqual(getAccount(`Bearer ${account.token}`).plan, plan);
+  assert.deepEqual(login('plan@example.com', 'a-long-password').plan, plan);
 });

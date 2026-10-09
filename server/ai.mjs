@@ -9,7 +9,13 @@ const image = (dataUrl) => {
   if (!match) throw Object.assign(new Error('Unsupported meal photo.'), { status: 400 });
   return { mimeType: match[1], data: match[2] };
 };
-const providerError = (provider, status) => Object.assign(new Error(`${provider} request failed (${status}). Check your API key, model access, and usage limits.`), { status: 502 });
+const providerError = (provider, status) => {
+  const reason = status === 401 ? 'The API key was rejected. Enter the correct key and verify again.' : status === 403 ? 'The key does not have access to this model. Check its permissions and verify again.'
+    : status === 429 ? 'The provider rate limit or account quota was reached.'
+      : status === 400 || status === 404 ? 'The provider rejected the request or the configured model is unavailable.'
+        : 'The provider could not complete the request.';
+  return Object.assign(new Error(`${provider} request failed (${status}). ${reason}`), { status: 502 });
+};
 
 export async function generate({ provider, apiKey, instructions, messages, imageDataUrl, jsonSchema }) {
   if (!models[provider] || !apiKey) throw Object.assign(new Error('Set up an AI provider and key when you sign in.'), { status: 409 });

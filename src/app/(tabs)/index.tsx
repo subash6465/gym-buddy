@@ -3,7 +3,8 @@ import { Pressable, Text, View } from 'react-native';
 import { Card, Icon, Meter, MotionPressable, Orbit, Page, Row, Title, ui } from '@/components/UI';
 import { Meal, today, useStore } from '@/lib/store';
 import { useClock } from '@/lib/clock';
-import { suggestedTargets } from '@/lib/targets';
+import { planTargets } from '@/lib/targets';
+import { useAuth } from '@/lib/auth';
 import { theme } from '@/lib/theme';
 
 const sum = (items: Meal[], key: 'calories' | 'protein' | 'carbs' | 'fat' | 'fibre' | 'sugar') =>
@@ -21,6 +22,7 @@ function Metric({ icon, label, value, guide, fraction, color }: {
 
 export default function Today() {
   const store = useStore();
+  const auth = useAuth();
   const now = useClock();
   const date = today(now);
   const meals = store.meals.filter((item) => item.date === date);
@@ -28,7 +30,8 @@ export default function Today() {
   const calories = sum(meals, 'calories');
   const protein = sum(meals, 'protein');
   const water = store.water[date] || 0;
-  const targets = suggestedTargets(store.profile, store.weighIns[0]?.kg, now);
+  const targets = planTargets(store.profile, store.weighIns[0]?.kg, auth.plan, now);
+  const todayPlan = auth.plan?.days[(now.getDay() + 6) % 7];
   const firstName = store.profile.name.trim().split(' ')[0];
   const recent = [
     ...meals.map((item) => ({ id: item.id, title: item.name, detail: `${Math.round(item.calories)} kcal · ${Math.round(item.protein)} g protein`, icon: 'meal' as const, kind: 'MEAL' })),
@@ -78,9 +81,9 @@ export default function Today() {
     <MotionPressable onPress={() => router.push('/(tabs)/plan')} style={{ width: '100%' }}>
       <Card style={{ width: '100%', flexDirection: 'row', alignItems: 'center', gap: 13 }}>
         <View style={{ width: 46, height: 46, borderRadius: 15, backgroundColor: 'rgba(118,240,219,0.15)', alignItems: 'center', justifyContent: 'center' }}><Icon name="workout" color={theme.accent} size={23} /></View>
-        <View style={{ flex: 1 }}><Text style={{ color: theme.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>DAY 1 · FULL BODY</Text>
-          <Text style={{ color: theme.text, fontSize: 16, fontWeight: '800', marginTop: 3 }}>Strength session</Text>
-          <Text style={[ui.muted, { fontSize: 11 }]}>Squat · row · press · core</Text></View>
+        <View style={{ flex: 1 }}><Text style={{ color: theme.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>{todayPlan ? `${todayPlan.day.toUpperCase()} · ${todayPlan.isRest ? 'RECOVERY' : `${todayPlan.minutes} MIN`}` : 'YOUR WEEKLY PLAN'}</Text>
+          <Text style={{ color: theme.text, fontSize: 16, fontWeight: '800', marginTop: 3 }}>{todayPlan?.title || 'Open your plan'}</Text>
+          <Text style={[ui.muted, { fontSize: 11 }]}>{todayPlan?.activities.join(' · ') || 'See your day-by-day schedule'}</Text></View>
         <Icon name="arrow" color={theme.text} size={17} />
       </Card>
     </MotionPressable>

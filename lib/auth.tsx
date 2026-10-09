@@ -3,15 +3,19 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import { Platform } from 'react-native';
 import type { Profile } from './store';
 import type { MealEstimate } from './mealEstimate';
+import type { AiPlan } from './plan';
 import { apiUrl } from './apiUrl';
 
 export type AiProvider = 'openai' | 'claude' | 'gemini';
-type Account = { user: { id: string; email: string }; profile: Profile | null; ai: { provider: AiProvider | null; configured: boolean } };
+type Account = { user: { id: string; email: string }; profile: Profile | null; ai: { provider: AiProvider | null; configured: boolean }; plan: AiPlan | null };
 type Auth = Account & {
   ready: boolean;
-  signIn: (email: string, password: string, create: boolean, provider: AiProvider, apiKey: string) => Promise<void>;
-  saveAiConfig: (provider: AiProvider, apiKey: string) => Promise<void>;
+  verifyAiKey: (provider: AiProvider, apiKey: string) => Promise<string>;
+  signIn: (email: string, password: string, create: boolean, provider: AiProvider, apiKey: string, verificationTicket: string) => Promise<void>;
+  saveAiConfig: (provider: AiProvider, apiKey: string, verificationTicket: string) => Promise<void>;
   estimateMeal: (description: string, imageDataUrl: string | null) => Promise<MealEstimate>;
+  completeOnboarding: (profile: Profile) => Promise<void>;
+  revisePlan: (messages: { role: 'user' | 'assistant'; content: string }[]) => Promise<void>;
   saveProfile: (profile: Profile) => Promise<void>;
   signOut: () => Promise<void>;
   deleteAccount: (clearLocalData: () => Promise<void>) => Promise<void>;
@@ -31,7 +35,7 @@ async function request<T>(path: string, method: string, token?: string, body?: o
   let response: Response;
   const base = apiUrl();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), ['/chat', '/estimate-meal'].includes(path) ? 70_000 : 8000);
+  const timeout = setTimeout(() => controller.abort(), ['/chat', '/estimate-meal', '/verify-ai-key', '/onboarding', '/plan/revise'].includes(path) ? 90_000 : 8000);
   try {
     response = await fetch(`${base}${path}`, {
       method, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -47,7 +51,7 @@ async function request<T>(path: string, method: string, token?: string, body?: o
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const emptyAccount: Account = { user: { id: '', email: '' }, profile: null, ai: { provider: null, configured: false } };
+  const emptyAccount: Account = { user: { id: '', email: '' }, profile: null, ai: { provider: null, configured: false }, plan: null };
   const [account, setAccount] = useState<Account>(emptyAccount);
   const [token, setToken] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -67,20 +71,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => { active = false; };
   }, []);
   const value = useMemo<Auth>(() => ({ ...account, ready,
-    signIn: async (email, password, create, provider, apiKey) => {
-      const result = await request<Account & { token: string }>(create ? '/auth/register' : '/auth/login', 'POST', undefined, { email, password, provider, apiKey });
+    verifyAiKey: async (provider, apiKey) => {
+      const result = await request<{ verified: boolean; ticket: string }>('/verify-ai-key', 'POST', undefined, { provider, apiKey });
+      if (!result.verified || !result.ticket) throw new Error('The provider did not verify the key.');
+      return result.ticket;
+    },
+    signIn: async (email, password, create, provider, apiKey, verificationTicket) => {
+      const result = await request<Account & { token: string }>(create ? '/auth/register' : '/auth/login', 'POST', undefined, { email, password, provider, apiKey, verificationTicket });
       await writeToken(result.token);
       setToken(result.token);
-      setAccount({ user: result.user, profile: result.profile, ai: result.ai });
+      setAccount({ user: result.user, profile: result.profile, ai: result.ai, plan: result.plan });
     },
-    saveAiConfig: async (provider, apiKey) => {
+    saveAiConfig: async (provider, apiKey, verificationTicket) => {
       if (!token) throw new Error('Sign in again to continue.');
-      const result = await request<{ ai: Account['ai'] }>('/ai-config', 'PUT', token, { provider, apiKey });
+      const result = await request<{ ai: Account['ai'] }>('/ai-config', 'PUT', token, { provider, apiKey, verificationTicket });
       setAccount((old) => ({ ...old, ai: result.ai }));
     },
     estimateMeal: async (description, imageDataUrl) => {
       if (!token) throw new Error('Sign in again to continue.');
       return request<MealEstimate>('/estimate-meal', 'POST', token, { description, ...(imageDataUrl ? { imageDataUrl } : {}) });
+    },
+    completeOnboarding: async (profile) => {
+      if (!token) throw new Error('Sign in again to continue.');
+      const result = await request<{ profile: Profile; plan: AiPlan }>('/onboarding', 'POST', token, profile);
+      setAccount((old) => ({ ...old, profile: result.profile, plan: result.plan }));
+    },
+    revisePlan: async (messages) => {
+      if (!token) throw new Error('Sign in again to continue.');
+      const result = await request<{ plan: AiPlan }>('/plan/revise', 'POST', token, { messages });
+      setAccount((old) => ({ ...old, plan: result.plan }));
     },
     saveProfile: (profile) => {
       if (!token) return Promise.reject(new Error('Sign in again to continue.'));

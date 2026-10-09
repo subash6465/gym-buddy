@@ -1,7 +1,9 @@
 import 'dotenv/config';
 import { createServer } from 'node:http';
-import { deleteAccount, getAccount, getAiConfig, login, logout, register, saveAiConfig, saveProfile } from './accounts.mjs';
+import { deleteAccount, getAccount, getAiConfig, login, logout, register, saveAiConfig, saveOnboarding, savePlan, saveProfile, validateProfile } from './accounts.mjs';
 import { generate } from './ai.mjs';
+import { requireVerifiedKey, verifyAiKey } from './ai-verification.mjs';
+import { createPlan } from './planning.mjs';
 
 const port = Number(process.env.PORT || 8787);
 const host = process.env.HOST || '0.0.0.0';
@@ -60,17 +62,33 @@ const server = createServer(async (req, res) => {
     try { return send(res, 200, getAccount(req.headers.authorization)); }
     catch (error) { return send(res, error.status || 500, { error: error.message }); }
   }
-  if (['/auth/register', '/auth/login', '/auth/logout', '/profile', '/account', '/ai-config', '/chat'].includes(req.url)) {
+  if (['/auth/register', '/auth/login', '/auth/logout', '/profile', '/account', '/ai-config', '/chat', '/verify-ai-key', '/onboarding', '/plan/revise'].includes(req.url)) {
     try {
       let raw = '';
       for await (const chunk of req) { raw += chunk; if (raw.length > 20_000) throw Object.assign(new Error('Request is too large.'), { status: 413 }); }
       const body = raw ? JSON.parse(raw) : {};
-      if (req.url === '/auth/register' && req.method === 'POST') return send(res, 201, register(body.email, body.password, body.provider, body.apiKey));
-      if (req.url === '/auth/login' && req.method === 'POST') return send(res, 200, login(body.email, body.password, body.provider, body.apiKey));
+      if (req.url === '/verify-ai-key' && req.method === 'POST') return send(res, 200, await verifyAiKey(body.provider, body.apiKey));
+      if (req.url === '/auth/register' && req.method === 'POST') { requireVerifiedKey(body.provider, body.apiKey, body.verificationTicket); return send(res, 201, register(body.email, body.password, body.provider, body.apiKey)); }
+      if (req.url === '/auth/login' && req.method === 'POST') { requireVerifiedKey(body.provider, body.apiKey, body.verificationTicket); return send(res, 200, login(body.email, body.password, body.provider, body.apiKey)); }
       if (req.url === '/auth/logout' && req.method === 'POST') { logout(req.headers.authorization); return send(res, 200, { ok: true }); }
       if (req.url === '/profile' && req.method === 'PUT') return send(res, 200, saveProfile(req.headers.authorization, body));
+      if (req.url === '/onboarding' && req.method === 'POST') {
+        const account = getAccount(req.headers.authorization);
+        if (account.profile) return send(res, 409, { error: 'Onboarding is already complete.' });
+        validateProfile(body);
+        const plan = await createPlan(body, getAiConfig(req.headers.authorization));
+        return send(res, 200, saveOnboarding(req.headers.authorization, body, plan));
+      }
+      if (req.url === '/plan/revise' && req.method === 'POST') {
+        const account = getAccount(req.headers.authorization);
+        if (!account.profile) return send(res, 409, { error: 'Complete onboarding first.' });
+        if (!Array.isArray(body.messages) || body.messages.length < 1 || body.messages.length > 20 ||
+            body.messages.some((item) => !item || !['user', 'assistant'].includes(item.role) || typeof item.content !== 'string' || item.content.length > 2000)) return send(res, 400, { error: 'Send a short conversation to revise the plan.' });
+        const plan = await createPlan(account.profile, getAiConfig(req.headers.authorization), body.messages, account.plan);
+        return send(res, 200, savePlan(req.headers.authorization, plan));
+      }
       if (req.url === '/account' && req.method === 'DELETE') return send(res, 200, deleteAccount(req.headers.authorization));
-      if (req.url === '/ai-config' && req.method === 'PUT') return send(res, 200, saveAiConfig(req.headers.authorization, body.provider, body.apiKey));
+      if (req.url === '/ai-config' && req.method === 'PUT') { requireVerifiedKey(body.provider, body.apiKey, body.verificationTicket); return send(res, 200, saveAiConfig(req.headers.authorization, body.provider, body.apiKey)); }
       if (req.url === '/chat' && req.method === 'POST') {
         const config = getAiConfig(req.headers.authorization);
         return send(res, 200, { reply: await chat(body.messages, body.context, config.provider, config.apiKey) });

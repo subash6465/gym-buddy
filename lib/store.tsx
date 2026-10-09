@@ -19,6 +19,7 @@ export type Profile = {
   equation: 'female' | 'male' | ''; activity: 'sedentary' | 'light' | 'moderate' | 'high'; nutritionCaution: boolean;
   allergies: string; concerns: string;
   fitnessPlan: string; weightKg: number;
+  daysPerWeek: number; pace: 'light' | 'moderate' | 'aggressive';
 };
 type Data = { profile: Profile; meals: Meal[]; workouts: Workout[]; weighIns: WeighIn[]; water: Record<string, number>; waterEntries: WaterEntry[]; stepEntries: StepEntry[] };
 type Store = Data & {
@@ -38,7 +39,7 @@ type Store = Data & {
 };
 
 const initial: Data = {
-  profile: { name: '', goal: 'maintain', setting: 'gym', dob: '', heightCm: '', equation: '', activity: 'light', nutritionCaution: false, allergies: '', concerns: '', fitnessPlan: '', weightKg: 0 },
+  profile: { name: '', goal: 'maintain', setting: 'gym', dob: '', heightCm: '', equation: '', activity: 'light', nutritionCaution: false, allergies: '', concerns: '', fitnessPlan: '', weightKg: 0, daysPerWeek: 3, pace: 'moderate' },
   meals: [], workouts: [], weighIns: [], water: {}, waterEntries: [], stepEntries: [],
 };
 const Context = createContext<Store | null>(null);
@@ -92,7 +93,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       catch (error) { setProfileSyncError(error instanceof Error ? error.message : 'Could not save profile.'); throw error; }
     },
     completeOnboarding: async (profile) => {
-      await auth.saveProfile(profile);
+      await auth.completeOnboarding(profile);
       setData((old) => ({ ...old, profile, weighIns: [{ id: newId(), date: today(), kg: profile.weightKg }, ...old.weighIns] }));
     },
     updateProfile: (patch) => setData((old) => ({ ...old, profile: { ...old.profile, ...patch } })),
