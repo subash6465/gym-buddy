@@ -1,5 +1,7 @@
 import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StoreProvider, useStore } from '@/lib/store';
 import { theme } from '@/lib/theme';
@@ -19,5 +21,6 @@ function Routes() {
 }
 
 export default function RootLayout() {
+  useEffect(() => { SplashScreen.hideAsync().catch(console.warn); }, []);
   return <SafeAreaProvider><MotionProvider><AuthProvider><StoreProvider><Routes /></StoreProvider></AuthProvider></MotionProvider></SafeAreaProvider>;
 }
