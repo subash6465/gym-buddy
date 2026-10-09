@@ -13,6 +13,8 @@ const symbolNames = {
   home: { ios: 'house.fill', android: 'home', web: 'home' },
   log: { ios: 'plus.circle.fill', android: 'add_circle', web: 'add_circle' },
   plan: { ios: 'calendar', android: 'calendar_month', web: 'calendar_month' },
+  history: { ios: 'clock.arrow.circlepath', android: 'history', web: 'history' },
+  chat: { ios: 'bubble.left.and.bubble.right.fill', android: 'chat', web: 'chat' },
   you: { ios: 'person.crop.circle', android: 'account_circle', web: 'account_circle' },
   meal: { ios: 'fork.knife', android: 'restaurant', web: 'restaurant' },
   water: { ios: 'drop.fill', android: 'water_drop', web: 'water_drop' },

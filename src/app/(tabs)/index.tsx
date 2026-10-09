@@ -41,6 +41,10 @@ export default function Today() {
       Own your momentum.
     </Title>
 
+    <MotionPressable onPress={() => router.push('/chat')} style={{ width: '100%', minHeight: 72, borderRadius: 20, backgroundColor: theme.accent }}>
+      <Row><Icon name="chat" color={theme.ink} size={26} /><View><Text style={{ color: theme.ink, fontSize: 18, fontWeight: '800' }}>Ask Gym Buddy AI</Text><Text style={{ color: theme.ink, fontSize: 11 }}>Chat about your plan, meals, and progress</Text></View></Row>
+    </MotionPressable>
+
     <Card style={{ backgroundColor: 'rgba(45,104,106,0.28)', borderColor: 'rgba(118,240,219,0.3)' }}>
       <Row><Text style={{ color: theme.text, fontSize: 11, fontWeight: '800', letterSpacing: 1.2, flex: 1 }}>TODAY’S ENERGY</Text>
         <Text style={{ color: theme.accent, fontSize: 10, fontWeight: '800' }}>{targets ? 'DAILY GUIDE' : 'SET YOUR GUIDE'}</Text></Row>

@@ -10,6 +10,8 @@ type Auth = Account & {
   signIn: (email: string, password: string, create: boolean) => Promise<void>;
   saveProfile: (profile: Profile) => Promise<void>;
   signOut: () => Promise<void>;
+  deleteAccount: (clearLocalData: () => Promise<void>) => Promise<void>;
+  chat: (messages: { role: 'user' | 'assistant'; content: string }[], context: string) => Promise<string>;
 };
 const Context = createContext<Auth | null>(null);
 const sessionKey = 'gym-buddy-session';
@@ -25,7 +27,7 @@ async function request<T>(path: string, method: string, token?: string, body?: o
   let response: Response;
   const base = apiUrl();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
+  const timeout = setTimeout(() => controller.abort(), path === '/chat' ? 125_000 : 8000);
   try {
     response = await fetch(`${base}${path}`, {
       method, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -81,6 +83,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await writeToken(null);
       setToken(null);
       setAccount({ user: { id: '', email: '' }, profile: null });
+    },
+    deleteAccount: async (clearLocalData) => {
+      if (!token) throw new Error('Sign in again to continue.');
+      await saveQueue.current.catch(() => {});
+      await request('/account', 'DELETE', token);
+      try { await clearLocalData(); }
+      finally {
+        await writeToken(null).catch(() => {});
+        setToken(null);
+        setAccount({ user: { id: '', email: '' }, profile: null });
+      }
+    },
+    chat: async (messages, context) => {
+      if (!token) throw new Error('Sign in again to continue.');
+      const result = await request<{ reply: string }>('/chat', 'POST', token, { messages, context });
+      return result.reply;
     },
   }), [account, ready, token]);
   return <Context.Provider value={value}>{children}</Context.Provider>;

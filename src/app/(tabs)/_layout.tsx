@@ -6,7 +6,7 @@ import { Icon } from '@/components/UI';
 import { theme } from '@/lib/theme';
 import { useReduceMotion } from '@/lib/motion';
 
-function TabIcon({ name, color, focused }: { name: 'home' | 'log' | 'plan' | 'you'; color: ColorValue; focused: boolean }) {
+function TabIcon({ name, color, focused }: { name: 'home' | 'log' | 'plan' | 'history' | 'you'; color: ColorValue; focused: boolean }) {
   const reduced = useReduceMotion();
   const [scale] = useState(() => new Animated.Value(1));
   useEffect(() => {
@@ -43,6 +43,7 @@ export default function TabLayout() {
     <Tabs.Screen name="index" options={{ title: 'Today', tabBarIcon: ({ color, focused }) => <TabIcon name="home" color={color} focused={focused} /> }} />
     <Tabs.Screen name="log" options={{ title: 'Log', tabBarIcon: ({ color, focused }) => <TabIcon name="log" color={color} focused={focused} /> }} />
     <Tabs.Screen name="plan" options={{ title: 'Plan', tabBarIcon: ({ color, focused }) => <TabIcon name="plan" color={color} focused={focused} /> }} />
+    <Tabs.Screen name="history" options={{ title: 'History', tabBarIcon: ({ color, focused }) => <TabIcon name="history" color={color} focused={focused} /> }} />
     <Tabs.Screen name="profile" options={{ title: 'You', tabBarIcon: ({ color, focused }) => <TabIcon name="you" color={color} focused={focused} /> }} />
   </Tabs>;
 }

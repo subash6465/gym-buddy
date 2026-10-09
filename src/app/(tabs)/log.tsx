@@ -7,7 +7,7 @@ import { estimateMeal, MealEstimate } from '@/lib/mealEstimate';
 import { Meal, today, useStore } from '@/lib/store';
 import { theme } from '@/lib/theme';
 
-type Mode = 'meal' | 'workout' | 'weight' | 'water';
+type Mode = 'meal' | 'workout' | 'weight' | 'water' | 'steps';
 const clockTime = () => { const date = new Date(); return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`; };
 
 export default function Log() {
@@ -18,11 +18,12 @@ export default function Log() {
   const [description, setDescription] = useState('');
   const [mealType, setMealType] = useState<Meal['type']>('breakfast');
   const [mealTime, setMealTime] = useState(clockTime());
+  const [workoutTime, setWorkoutTime] = useState(clockTime());
   const [estimate, setEstimate] = useState<MealEstimate | null>(null);
   const [estimating, setEstimating] = useState(false);
   const [error, setError] = useState('');
   const [name, setName] = useState(''); const [note, setNote] = useState('');
-  const [minutes, setMinutes] = useState(''); const [weight, setWeight] = useState(''); const [water, setWater] = useState('');
+  const [minutes, setMinutes] = useState(''); const [weight, setWeight] = useState(''); const [water, setWater] = useState(''); const [steps, setSteps] = useState('');
   const existing = mealType !== 'snack' ? store.meals.find((meal) => meal.date === today() && meal.type === mealType) : null;
 
   async function pickPhoto(camera: boolean) {
@@ -61,16 +62,21 @@ export default function Log() {
       if (!Number.isFinite(ml) || ml <= 0 || ml > 5000) return Alert.alert('Check water', 'Enter an amount in millilitres.');
       store.addWater(today(), ml); setWater(''); Alert.alert('Saved', 'Your water has been logged.'); return;
     }
+    if (mode === 'steps') {
+      const count = Number(steps);
+      if (!Number.isInteger(count) || count <= 0 || count > 100000) return Alert.alert('Check steps', 'Enter a valid number of steps.');
+      store.addSteps(today(), count); setSteps(''); Alert.alert('Saved', 'Your steps have been logged.'); return;
+    }
     const duration = Number(minutes);
     if (!name.trim() || !Number.isFinite(duration) || duration <= 0 || duration > 1440) return Alert.alert('Check workout', 'Enter an activity and its duration in minutes.');
-    store.addWorkout({ date: today(), name: name.trim(), minutes: duration, note: note.trim() });
-    setName(''); setNote(''); setMinutes(''); Alert.alert('Workout logged', 'Nice work showing up today.');
+    store.addWorkout({ date: today(), time: workoutTime, name: name.trim(), minutes: duration, note: note.trim() });
+    setName(''); setNote(''); setMinutes(''); setWorkoutTime(clockTime()); Alert.alert('Workout logged', 'Nice work showing up today.');
   }
 
   return <Page>
     <Title eyebrow="BUILD THE HABIT" subtitle="Capture the details that help you grow.">Log it. Keep moving.</Title>
     <View style={{ flexDirection: 'row', gap: 5, padding: 5, borderRadius: 16, backgroundColor: theme.cardAlt, borderWidth: 1, borderColor: theme.line }}>
-      {(['meal', 'workout', 'weight', 'water'] as const).map((option) =>
+      {(['meal', 'workout', 'weight', 'water', 'steps'] as const).map((option) =>
         <MotionPressable key={option} onPress={() => setMode(option)} accessibilityState={{ selected: mode === option }}
           style={{ flex: 1, minHeight: 40, borderRadius: 12, backgroundColor: mode === option ? theme.accent : 'transparent' }}>
           <Text style={{ color: mode === option ? theme.ink : theme.muted, fontWeight: '800', fontSize: 11, textTransform: 'capitalize' }}>{option}</Text>
@@ -109,10 +115,11 @@ export default function Log() {
         <Button onPress={saveMeal}>{existing ? `Replace ${mealType}` : 'Save meal'}</Button>
       </Card></Reveal>}
     </Reveal> : <Reveal key={mode}><Card>
-      <Text style={{ color: theme.text, fontSize: 19, fontWeight: '800' }}>{mode === 'weight' ? 'Weight check-in' : mode === 'water' ? 'Hydration check-in' : 'Workout details'}</Text>
+      <Text style={{ color: theme.text, fontSize: 19, fontWeight: '800' }}>{mode === 'weight' ? 'Weight check-in' : mode === 'water' ? 'Hydration check-in' : mode === 'steps' ? 'Steps check-in' : 'Workout details'}</Text>
       {mode === 'weight' ? <><Label>WEIGHT (KG)</Label><Input value={weight} onChangeText={setWeight} keyboardType="decimal-pad" placeholder="e.g. 72.5" /></> :
         mode === 'water' ? <><Label>AMOUNT (ML)</Label><Input value={water} onChangeText={setWater} keyboardType="number-pad" placeholder="e.g. 250" /></> :
-          <><Label>ACTIVITY</Label><Input value={name} onChangeText={setName} placeholder="e.g. strength training" /><Label>EXERCISES OR NOTES</Label><Input value={note} onChangeText={setNote} multiline placeholder="e.g. squats, rows and presses" style={{ minHeight: 78, textAlignVertical: 'top' }} /><Label>DURATION (MINUTES)</Label><Input value={minutes} onChangeText={setMinutes} keyboardType="number-pad" placeholder="e.g. 45" /></>}
+        mode === 'steps' ? <><Label>STEPS</Label><Input value={steps} onChangeText={setSteps} keyboardType="number-pad" placeholder="e.g. 3200" /></> :
+          <><Label>ACTIVITY</Label><Input value={name} onChangeText={setName} placeholder="e.g. strength training" /><Label>EXERCISES OR NOTES</Label><Input value={note} onChangeText={setNote} multiline placeholder="e.g. squats, rows and presses" style={{ minHeight: 78, textAlignVertical: 'top' }} /><Label>START TIME</Label><MealTimePicker value={workoutTime} onChange={setWorkoutTime} /><Label>DURATION (MINUTES)</Label><Input value={minutes} onChangeText={setMinutes} keyboardType="number-pad" placeholder="e.g. 45" /></>}
       <Button onPress={saveOther}>Save {mode}</Button>
     </Card></Reveal>}
   </Page>;

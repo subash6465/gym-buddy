@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 process.env.DATABASE_PATH = ':memory:';
-const { register, login, getAccount, saveProfile, logout } = await import('../server/accounts.mjs');
+const { register, login, getAccount, saveProfile, logout, deleteAccount } = await import('../server/accounts.mjs');
 
 test('account setup persists profile and sessions are isolated', () => {
   const first = register(' First@Example.com ', 'a-long-password');
@@ -23,4 +23,18 @@ test('account setup persists profile and sessions are isolated', () => {
   logout(`Bearer ${first.token}`);
   assert.throws(() => getAccount(`Bearer ${first.token}`), { status: 401 });
   assert.deepEqual(getAccount(`Bearer ${returning.token}`).profile, profile);
+});
+
+test('deleting an account removes credentials, profile, and every session', () => {
+  const account = register('delete@example.com', 'a-long-password');
+  const secondSession = login('delete@example.com', 'a-long-password');
+  const profile = { name: 'Ari', dob: '1990-01-01', heightCm: '170', weightKg: 70,
+    goal: 'maintain', setting: 'gym', activity: 'light', equation: '', nutritionCaution: false,
+    allergies: '', concerns: '', fitnessPlan: '' };
+  saveProfile(`Bearer ${account.token}`, profile);
+  assert.deepEqual(deleteAccount(`Bearer ${account.token}`), { ok: true });
+  assert.throws(() => getAccount(`Bearer ${account.token}`), { status: 401 });
+  assert.throws(() => getAccount(`Bearer ${secondSession.token}`), { status: 401 });
+  assert.throws(() => login('delete@example.com', 'a-long-password'), { status: 401 });
+  assert.equal(register('delete@example.com', 'a-long-password').profile, null);
 });

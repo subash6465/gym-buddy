@@ -13,7 +13,7 @@ function Routes() {
   return <><StatusBar style="light" /><Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.bg } }}>
     <Stack.Protected guard={!auth.user.id}><Stack.Screen name="index" /></Stack.Protected>
     <Stack.Protected guard={Boolean(auth.user.id) && !auth.profile}><Stack.Screen name="onboarding" /></Stack.Protected>
-    <Stack.Protected guard={Boolean(auth.user.id && auth.profile)}><Stack.Screen name="(tabs)" /><Stack.Screen name="modal" /></Stack.Protected>
+    <Stack.Protected guard={Boolean(auth.user.id && auth.profile)}><Stack.Screen name="(tabs)" /><Stack.Screen name="chat" /><Stack.Screen name="modal" /></Stack.Protected>
   </Stack></>;
 }
 

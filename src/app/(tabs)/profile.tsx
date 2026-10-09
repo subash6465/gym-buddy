@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, Text, View } from 'react-native';
 import BirthDatePicker from '@/components/BirthDatePicker';
 import { Button, Card, Input, Label, MotionPressable, Page, Reveal, Row, Title, ui } from '@/components/UI';
 import { Goal, useStore } from '@/lib/store';
@@ -16,6 +16,20 @@ export default function ProfileScreen() {
   const auth = useAuth();
   const { profile } = store;
   const [showHistory, setShowHistory] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const deleteAccount = async () => {
+    if (deletingAccount) return;
+    setDeletingAccount(true); setDeleteError('');
+    try { await auth.deleteAccount(store.clearAccountData); }
+    catch (error) { setDeleteError(error instanceof Error ? error.message : 'Could not delete your account.'); }
+    finally { setDeletingAccount(false); }
+  };
+  const confirmDelete = () => {
+    const message = 'Are you sure you want to delete your account? Your login, profile, and all logged data will be permanently deleted. This cannot be reversed.';
+    if (Platform.OS === 'web') { if (window.confirm(message)) void deleteAccount(); }
+    else Alert.alert('Delete account?', message, [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete account', style: 'destructive', onPress: () => { void deleteAccount(); } }]);
+  };
   const now = useClock();
   const latest = store.weighIns[0];
   const age = ageOnDate(profile.dob, now);
@@ -46,6 +60,11 @@ export default function ProfileScreen() {
     </Card>
     <Card><Text style={{ color: theme.text, fontSize: 20, fontWeight: '800' }}>Preferences & care</Text><Label>YOUR FITNESS PLAN OR SCHEDULE</Label><Input value={profile.fitnessPlan} onChangeText={(fitnessPlan) => store.updateProfile({ fitnessPlan })} placeholder="Your training rhythm" multiline /><Label>ALLERGIES OR FOODS TO AVOID</Label><Input value={profile.allergies} onChangeText={(allergies) => store.updateProfile({ allergies })} placeholder="e.g. peanuts, dairy" multiline /><Label>INJURIES, PAIN OR OTHER CONCERNS</Label><Input value={profile.concerns} onChangeText={(concerns) => store.updateProfile({ concerns })} placeholder="Anything your plan should consider" multiline style={{ minHeight: 72, textAlignVertical: 'top' }} /><Text style={ui.muted}>Seek qualified guidance for injuries, symptoms, or dietary restrictions needing medical care.</Text></Card>
     <Button secondary onPress={() => auth.signOut()}>Sign out</Button>
+    <Card><Text style={{ color: theme.text, fontSize: 18, fontWeight: '800' }}>Delete account</Text>
+      <Text style={ui.muted}>Permanently removes your login, profile, and activity saved on this device.</Text>
+      {deleteError ? <Text accessibilityRole="alert" style={{ color: theme.red }}>{deleteError}</Text> : null}
+      <Button secondary disabled={deletingAccount} onPress={confirmDelete}>{deletingAccount ? 'Deleting account…' : 'Delete my account'}</Button>
+    </Card>
     <Button secondary onPress={() => setShowHistory(!showHistory)}>{showHistory ? 'Hide' : 'Show'} log history</Button>
     {showHistory && <Reveal><Card><Text style={{ color: theme.text, fontSize: 20, fontWeight: '800' }}>Log history</Text>
       {store.meals.length + store.workouts.length + store.weighIns.length === 0 ? <Text style={ui.muted}>No entries yet.</Text> : null}

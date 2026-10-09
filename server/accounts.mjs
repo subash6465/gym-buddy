@@ -91,3 +91,10 @@ export function logout(authorization) {
   const token = /^Bearer ([a-f0-9]{64})$/.exec(authorization || '')?.[1];
   if (token) db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(hash(token));
 }
+
+export function deleteAccount(authorization) {
+  const user = currentUser(authorization);
+  // Foreign keys remove every session and the server-side profile with the user.
+  db.prepare('DELETE FROM users WHERE id = ?').run(user.id);
+  return { ok: true };
+}
