@@ -1,0 +1,31 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { generate } from '../server/ai.mjs';
+
+test('routes text and images to the chosen provider without exposing keys in output', async () => {
+  const original = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, options) => {
+    calls.push({ url, options, body: JSON.parse(options.body) });
+    const answer = url.includes('openai') ? { output: [{ type: 'message', content: [{ type: 'output_text', text: 'OpenAI reply' }] }] }
+      : url.includes('anthropic') ? { content: [{ type: 'text', text: 'Claude reply' }] }
+        : { candidates: [{ content: { parts: [{ text: 'Gemini reply' }] } }] };
+    return { ok: true, json: async () => answer };
+  };
+  try {
+    const input = { apiKey: 'private-test-key', instructions: 'Be helpful', messages: [{ role: 'user', content: 'Hello' }],
+      imageDataUrl: 'data:image/png;base64,aGVsbG8=' };
+    assert.equal(await generate({ ...input, provider: 'openai' }), 'OpenAI reply');
+    assert.equal(await generate({ ...input, provider: 'claude' }), 'Claude reply');
+    assert.equal(await generate({ ...input, provider: 'gemini' }), 'Gemini reply');
+    assert.match(calls[0].url, /api\.openai\.com/);
+    assert.equal(calls[0].options.headers.Authorization, 'Bearer private-test-key');
+    assert.equal(calls[0].body.input[0].content[1].type, 'input_image');
+    assert.match(calls[1].url, /api\.anthropic\.com/);
+    assert.equal(calls[1].options.headers['x-api-key'], 'private-test-key');
+    assert.equal(calls[1].body.messages[0].content[1].source.media_type, 'image/png');
+    assert.match(calls[2].url, /generativelanguage\.googleapis\.com/);
+    assert.equal(calls[2].options.headers['x-goog-api-key'], 'private-test-key');
+    assert.equal(calls[2].body.contents[0].parts[1].inlineData.mimeType, 'image/png');
+  } finally { globalThis.fetch = original; }
+});

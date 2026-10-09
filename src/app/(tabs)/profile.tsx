@@ -6,7 +6,7 @@ import { Goal, useStore } from '@/lib/store';
 import { ageOnDate, suggestedTargets } from '@/lib/targets';
 import { useClock } from '@/lib/clock';
 import { theme } from '@/lib/theme';
-import { useAuth } from '@/lib/auth';
+import { AiProvider, useAuth } from '@/lib/auth';
 
 function Choice<T extends string>({ options, value, onChange }: { options: readonly (readonly [T, string])[]; value: T; onChange: (value: T) => void }) {
   return <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{options.map(([option, label]) => <MotionPressable key={option} onPress={() => onChange(option)} accessibilityState={{ selected: value === option }} style={{ paddingHorizontal: 14, paddingVertical: 11, borderRadius: 12, backgroundColor: value === option ? theme.accent : theme.cardAlt }}><Text style={{ color: value === option ? theme.bg : theme.text, fontWeight: '800' }}>{label}</Text></MotionPressable>)}</View>;
@@ -18,6 +18,17 @@ export default function ProfileScreen() {
   const [showHistory, setShowHistory] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [aiProvider, setAiProvider] = useState<AiProvider>(auth.ai.provider || 'openai');
+  const [aiKey, setAiKey] = useState('');
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiMessage, setAiMessage] = useState('');
+  const saveAi = async () => {
+    if (aiBusy) return;
+    setAiBusy(true); setAiMessage('');
+    try { await auth.saveAiConfig(aiProvider, aiKey.trim()); setAiKey(''); setAiMessage('AI provider saved.'); }
+    catch (error) { setAiMessage(error instanceof Error ? error.message : 'Could not save AI provider.'); }
+    finally { setAiBusy(false); }
+  };
   const deleteAccount = async () => {
     if (deletingAccount) return;
     setDeletingAccount(true); setDeleteError('');
@@ -59,6 +70,13 @@ export default function ProfileScreen() {
       {targets ? <><Text style={{ color: theme.text, fontSize: 27, fontWeight: '800' }}>{targets.calories} kcal</Text><Text style={{ color: theme.text, fontSize: 18, fontWeight: '700' }}>{targets.protein} g protein · {targets.water} ml drinks</Text><Text style={ui.muted}>Estimated maintenance: {targets.maintenance} kcal. Goal adjustment: {profile.goal === 'lose' ? 'about −300 kcal' : profile.goal === 'gain' ? 'about +200 kcal' : 'none'}. Protein guide: {targets.proteinFactor} g/kg.</Text><Text style={ui.muted}>Water is a starting drinks target; food also supplies water. Heat, exercise, illness and medical conditions can change your needs. These are estimates, not prescriptions.</Text></> : <Text style={ui.muted}>Enter a valid birth date (age 20+), height, current weight, and equation reference to see estimates. Automatic targets are paused when special dietary care is selected or when weight loss is selected at a low BMI.</Text>}
     </Card>
     <Card><Text style={{ color: theme.text, fontSize: 20, fontWeight: '800' }}>Preferences & care</Text><Label>YOUR FITNESS PLAN OR SCHEDULE</Label><Input value={profile.fitnessPlan} onChangeText={(fitnessPlan) => store.updateProfile({ fitnessPlan })} placeholder="Your training rhythm" multiline /><Label>ALLERGIES OR FOODS TO AVOID</Label><Input value={profile.allergies} onChangeText={(allergies) => store.updateProfile({ allergies })} placeholder="e.g. peanuts, dairy" multiline /><Label>INJURIES, PAIN OR OTHER CONCERNS</Label><Input value={profile.concerns} onChangeText={(concerns) => store.updateProfile({ concerns })} placeholder="Anything your plan should consider" multiline style={{ minHeight: 72, textAlignVertical: 'top' }} /><Text style={ui.muted}>Seek qualified guidance for injuries, symptoms, or dietary restrictions needing medical care.</Text></Card>
+    <Card><Text style={{ color: theme.text, fontSize: 20, fontWeight: '800' }}>AI provider</Text>
+      <Text style={ui.muted}>Current: {auth.ai.configured ? auth.ai.provider?.toUpperCase() : 'Not configured'}. A new key replaces the saved key for this account.</Text>
+      <View style={{ flexDirection: 'row', gap: 8 }}>{([['openai', 'OpenAI'], ['claude', 'Claude'], ['gemini', 'Gemini']] as const).map(([value, label]) => <Pressable key={value} onPress={() => { setAiProvider(value); setAiKey(''); }} accessibilityRole="button" accessibilityState={{ selected: aiProvider === value }} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 42, borderRadius: 12, backgroundColor: aiProvider === value ? theme.accent : theme.cardAlt }}><Text style={{ color: aiProvider === value ? theme.ink : theme.text, fontWeight: '800' }}>{label}</Text></Pressable>)}</View>
+      <Label>NEW API KEY</Label><Input value={aiKey} onChangeText={setAiKey} secureTextEntry autoCapitalize="none" autoCorrect={false} placeholder="Paste a new API key" />
+      {aiMessage ? <Text accessibilityRole="alert" style={{ color: aiMessage === 'AI provider saved.' ? theme.accent : theme.red }}>{aiMessage}</Text> : null}
+      <Button disabled={aiBusy || aiKey.trim().length < 10} onPress={() => { void saveAi(); }}>{aiBusy ? 'Saving…' : 'Save AI provider'}</Button>
+    </Card>
     <Button secondary onPress={() => auth.signOut()}>Sign out</Button>
     <Card><Text style={{ color: theme.text, fontSize: 18, fontWeight: '800' }}>Delete account</Text>
       <Text style={ui.muted}>Permanently removes your login, profile, and activity saved on this device.</Text>

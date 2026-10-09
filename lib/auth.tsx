@@ -2,12 +2,16 @@ import * as SecureStore from 'expo-secure-store';
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import type { Profile } from './store';
+import type { MealEstimate } from './mealEstimate';
 import { apiUrl } from './apiUrl';
 
-type Account = { user: { id: string; email: string }; profile: Profile | null };
+export type AiProvider = 'openai' | 'claude' | 'gemini';
+type Account = { user: { id: string; email: string }; profile: Profile | null; ai: { provider: AiProvider | null; configured: boolean } };
 type Auth = Account & {
   ready: boolean;
-  signIn: (email: string, password: string, create: boolean) => Promise<void>;
+  signIn: (email: string, password: string, create: boolean, provider: AiProvider, apiKey: string) => Promise<void>;
+  saveAiConfig: (provider: AiProvider, apiKey: string) => Promise<void>;
+  estimateMeal: (description: string, imageDataUrl: string | null) => Promise<MealEstimate>;
   saveProfile: (profile: Profile) => Promise<void>;
   signOut: () => Promise<void>;
   deleteAccount: (clearLocalData: () => Promise<void>) => Promise<void>;
@@ -27,7 +31,7 @@ async function request<T>(path: string, method: string, token?: string, body?: o
   let response: Response;
   const base = apiUrl();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), path === '/chat' ? 125_000 : 8000);
+  const timeout = setTimeout(() => controller.abort(), ['/chat', '/estimate-meal'].includes(path) ? 70_000 : 8000);
   try {
     response = await fetch(`${base}${path}`, {
       method, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -43,7 +47,8 @@ async function request<T>(path: string, method: string, token?: string, body?: o
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [account, setAccount] = useState<Account>({ user: { id: '', email: '' }, profile: null });
+  const emptyAccount: Account = { user: { id: '', email: '' }, profile: null, ai: { provider: null, configured: false } };
+  const [account, setAccount] = useState<Account>(emptyAccount);
   const [token, setToken] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const saveQueue = useRef<Promise<void>>(Promise.resolve());
@@ -62,11 +67,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => { active = false; };
   }, []);
   const value = useMemo<Auth>(() => ({ ...account, ready,
-    signIn: async (email, password, create) => {
-      const result = await request<Account & { token: string }>(create ? '/auth/register' : '/auth/login', 'POST', undefined, { email, password });
+    signIn: async (email, password, create, provider, apiKey) => {
+      const result = await request<Account & { token: string }>(create ? '/auth/register' : '/auth/login', 'POST', undefined, { email, password, provider, apiKey });
       await writeToken(result.token);
       setToken(result.token);
-      setAccount({ user: result.user, profile: result.profile });
+      setAccount({ user: result.user, profile: result.profile, ai: result.ai });
+    },
+    saveAiConfig: async (provider, apiKey) => {
+      if (!token) throw new Error('Sign in again to continue.');
+      const result = await request<{ ai: Account['ai'] }>('/ai-config', 'PUT', token, { provider, apiKey });
+      setAccount((old) => ({ ...old, ai: result.ai }));
+    },
+    estimateMeal: async (description, imageDataUrl) => {
+      if (!token) throw new Error('Sign in again to continue.');
+      return request<MealEstimate>('/estimate-meal', 'POST', token, { description, ...(imageDataUrl ? { imageDataUrl } : {}) });
     },
     saveProfile: (profile) => {
       if (!token) return Promise.reject(new Error('Sign in again to continue.'));
@@ -82,7 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (token) await request('/auth/logout', 'POST', token).catch(() => {});
       await writeToken(null);
       setToken(null);
-      setAccount({ user: { id: '', email: '' }, profile: null });
+      setAccount(emptyAccount);
     },
     deleteAccount: async (clearLocalData) => {
       if (!token) throw new Error('Sign in again to continue.');
@@ -92,7 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       finally {
         await writeToken(null).catch(() => {});
         setToken(null);
-        setAccount({ user: { id: '', email: '' }, profile: null });
+        setAccount(emptyAccount);
       }
     },
     chat: async (messages, context) => {

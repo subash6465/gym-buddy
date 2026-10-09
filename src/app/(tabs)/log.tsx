@@ -3,7 +3,8 @@ import { useState } from 'react';
 import { Alert, Image, Text, View } from 'react-native';
 import MealTimePicker from '@/components/MealTimePicker';
 import { Button, Card, Icon, Input, Label, MotionPressable, Page, Reveal, Row, Title, ui } from '@/components/UI';
-import { estimateMeal, MealEstimate } from '@/lib/mealEstimate';
+import type { MealEstimate } from '@/lib/mealEstimate';
+import { useAuth } from '@/lib/auth';
 import { Meal, today, useStore } from '@/lib/store';
 import { theme } from '@/lib/theme';
 
@@ -12,6 +13,7 @@ const clockTime = () => { const date = new Date(); return `${String(date.getHour
 
 export default function Log() {
   const store = useStore();
+  const auth = useAuth();
   const [mode, setMode] = useState<Mode>('meal');
   const [photo, setPhoto] = useState<string | null>(null);
   const [photoData, setPhotoData] = useState<string | null>(null);
@@ -41,7 +43,7 @@ export default function Log() {
   async function analyze() {
     if (!description.trim() && !photoData) return setError('Describe the food or add a photo first.');
     setEstimating(true); setError(''); setEstimate(null);
-    try { setEstimate(await estimateMeal(description.trim(), photoData)); }
+    try { setEstimate(await auth.estimateMeal(description.trim(), photoData)); }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'AI estimate failed.'); }
     finally { setEstimating(false); }
   }

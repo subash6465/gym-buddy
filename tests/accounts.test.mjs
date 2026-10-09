@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 process.env.DATABASE_PATH = ':memory:';
-const { register, login, getAccount, saveProfile, logout, deleteAccount } = await import('../server/accounts.mjs');
+const { register, login, getAccount, getAiConfig, saveAiConfig, saveProfile, logout, deleteAccount } = await import('../server/accounts.mjs');
 
 test('account setup persists profile and sessions are isolated', () => {
   const first = register(' First@Example.com ', 'a-long-password');
@@ -26,7 +26,7 @@ test('account setup persists profile and sessions are isolated', () => {
 });
 
 test('deleting an account removes credentials, profile, and every session', () => {
-  const account = register('delete@example.com', 'a-long-password');
+  const account = register('delete@example.com', 'a-long-password', 'claude', 'test-claude-secret');
   const secondSession = login('delete@example.com', 'a-long-password');
   const profile = { name: 'Ari', dob: '1990-01-01', heightCm: '170', weightKg: 70,
     goal: 'maintain', setting: 'gym', activity: 'light', equation: '', nutritionCaution: false,
@@ -37,4 +37,17 @@ test('deleting an account removes credentials, profile, and every session', () =
   assert.throws(() => getAccount(`Bearer ${secondSession.token}`), { status: 401 });
   assert.throws(() => login('delete@example.com', 'a-long-password'), { status: 401 });
   assert.equal(register('delete@example.com', 'a-long-password').profile, null);
+});
+
+test('AI keys stay private, follow the account, and can be replaced', () => {
+  const first = register('ai-one@example.com', 'a-long-password', 'openai', 'test-openai-secret');
+  const second = register('ai-two@example.com', 'a-long-password', 'gemini', 'test-gemini-secret');
+  assert.deepEqual(first.ai, { provider: 'openai', configured: true });
+  assert.equal(JSON.stringify(first).includes('test-openai-secret'), false);
+  assert.deepEqual(getAiConfig(`Bearer ${first.token}`), { provider: 'openai', apiKey: 'test-openai-secret' });
+  assert.deepEqual(getAiConfig(`Bearer ${second.token}`), { provider: 'gemini', apiKey: 'test-gemini-secret' });
+  saveAiConfig(`Bearer ${first.token}`, 'claude', 'replacement-secret');
+  assert.deepEqual(getAiConfig(`Bearer ${first.token}`), { provider: 'claude', apiKey: 'replacement-secret' });
+  assert.deepEqual(login('ai-one@example.com', 'a-long-password').ai, { provider: 'claude', configured: true });
+  assert.throws(() => saveAiConfig(`Bearer ${second.token}`, 'other', 'wrong-secret'), { status: 400 });
 });

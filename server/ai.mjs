@@ -1,0 +1,53 @@
+const models = {
+  openai: () => process.env.OPENAI_MODEL || 'gpt-4o-mini',
+  claude: () => process.env.CLAUDE_MODEL || 'claude-haiku-5-5',
+  gemini: () => process.env.GEMINI_MODEL || 'gemini-3.8-flash',
+};
+const image = (dataUrl) => {
+  if (!dataUrl) return null;
+  const match = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
+  if (!match) throw Object.assign(new Error('Unsupported meal photo.'), { status: 400 });
+  return { mimeType: match[1], data: match[2] };
+};
+const providerError = (provider, status) => Object.assign(new Error(`${provider} request failed (${status}). Check your API key, model access, and usage limits.`), { status: 502 });
+
+export async function generate({ provider, apiKey, instructions, messages, imageDataUrl, jsonSchema }) {
+  if (!models[provider] || !apiKey) throw Object.assign(new Error('Set up an AI provider and key when you sign in.'), { status: 409 });
+  const photo = image(imageDataUrl);
+  const last = messages.length - 1;
+  let url; let headers; let body;
+  if (provider === 'openai') {
+    url = 'https://api.openai.com/v1/responses';
+    headers = { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' };
+    body = { model: models.openai(), store: false, instructions,
+      input: messages.map((message, index) => ({ role: message.role, content: index === last && photo
+        ? [{ type: 'input_text', text: message.content }, { type: 'input_image', image_url: imageDataUrl, detail: 'low' }]
+        : message.content })),
+      ...(jsonSchema ? { text: { format: { type: 'json_schema', name: 'meal_nutrition_estimate', strict: true, schema: jsonSchema } } } : {}) };
+  } else if (provider === 'claude') {
+    url = 'https://api.anthropic.com/v1/messages';
+    headers = { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' };
+    body = { model: models.claude(), max_tokens: 1200, system: instructions,
+      messages: messages.map((message, index) => ({ role: message.role, content: index === last && photo
+        ? [{ type: 'text', text: message.content }, { type: 'image', source: { type: 'base64', media_type: photo.mimeType, data: photo.data } }]
+        : message.content })), ...(jsonSchema ? { output_config: { format: { type: 'json_schema', schema: jsonSchema } } } : {}) };
+  } else {
+    url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(models.gemini())}:generateContent`;
+    headers = { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' };
+    body = { systemInstruction: { parts: [{ text: instructions }] },
+      contents: messages.map((message, index) => ({ role: message.role === 'assistant' ? 'model' : 'user', parts: [
+        { text: message.content }, ...(index === last && photo ? [{ inlineData: { mimeType: photo.mimeType, data: photo.data } }] : []),
+      ] })), ...(jsonSchema ? { generationConfig: { responseFormat: { text: { mimeType: 'application/json', schema: jsonSchema } } } } : {}) };
+  }
+  let response;
+  try { response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(60_000) }); }
+  catch { throw Object.assign(new Error(`${provider} is unavailable. Try again shortly.`), { status: 503 }); }
+  if (!response.ok) throw providerError(provider, response.status);
+  const payload = await response.json();
+  const text = provider === 'openai'
+    ? payload.output?.flatMap((item) => item.type === 'message' ? item.content || [] : []).filter((item) => item.type === 'output_text').map((item) => item.text).join('\n')
+    : provider === 'claude' ? payload.content?.filter((item) => item.type === 'text').map((item) => item.text).join('\n')
+      : payload.candidates?.[0]?.content?.parts?.filter((item) => typeof item.text === 'string').map((item) => item.text).join('\n');
+  if (!text?.trim()) throw Object.assign(new Error(`${provider} did not return a reply. Try again.`), { status: 502 });
+  return text.trim();
+}
