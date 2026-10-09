@@ -1,7 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
-import { theme } from './theme';
 import { withSavedMeal } from './meals';
 import { useAuth } from './auth';
 
@@ -86,8 +84,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }, 800);
     return () => clearTimeout(timer);
   }, [data.profile, auth.profile, ready]);
+  const effectiveReady = ready && auth.user.id === loadedUserId;
   const value = useMemo<Store>(() => ({
-    ...data, ready, profileSyncError,
+    ...data, ready: effectiveReady, profileSyncError,
     syncProfile: async () => {
       try { await auth.saveProfile(data.profile); setProfileSyncError(''); }
       catch (error) { setProfileSyncError(error instanceof Error ? error.message : 'Could not save profile.'); throw error; }
@@ -110,8 +109,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     },
     removeMeal: (id) => setData((old) => ({ ...old, meals: old.meals.filter((item) => item.id !== id) })),
     removeWorkout: (id) => setData((old) => ({ ...old, workouts: old.workouts.filter((item) => item.id !== id) })),
-  }), [data, ready, profileSyncError, auth]);
-  if (!ready || auth.user.id !== loadedUserId) return <View style={{ flex: 1, backgroundColor: theme.bg, justifyContent: 'center' }}><ActivityIndicator color={theme.accent} /></View>;
+  }), [data, effectiveReady, profileSyncError, auth]);
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 

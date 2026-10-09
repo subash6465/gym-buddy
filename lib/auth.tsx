@@ -35,16 +35,18 @@ async function request<T>(path: string, method: string, token?: string, body?: o
   let response: Response;
   const base = apiUrl();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), ['/chat', '/estimate-meal', '/verify-ai-key', '/onboarding', '/plan/revise'].includes(path) ? 90_000 : 8000);
+  const timeoutMs = ['/chat', '/estimate-meal', '/verify-ai-key', '/onboarding', '/plan/revise'].includes(path) ? 90_000 : 8000;
+  let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
-    response = await fetch(`${base}${path}`, {
+    response = await Promise.race<Response>([fetch(`${base}${path}`, {
       method, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       ...(body ? { body: JSON.stringify(body) } : {}),
       signal: controller.signal,
-    });
-  } catch {
+    }), new Promise<Response>((_, reject) => { timeout = setTimeout(() => { controller.abort(); reject(new Error('timeout')); }, timeoutMs); })]);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'timeout') throw new Error('The Gym Buddy API did not respond in time. Try again.');
     throw new Error(`Cannot reach the Gym Buddy API at ${base}. Start npm run api on your computer and keep your phone on the same Wi-Fi.`);
-  } finally { clearTimeout(timeout); }
+  } finally { if (timeout) clearTimeout(timeout); }
   const result = await response.json();
   if (!response.ok) throw Object.assign(new Error(result.error || 'Request failed.'), { status: response.status });
   return result as T;
