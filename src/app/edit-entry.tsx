@@ -5,6 +5,7 @@ import DaySelector from '@/components/DaySelector';
 import MealTimePicker from '@/components/MealTimePicker';
 import { Button, Card, Input, Label, Page, Title, ui } from '@/components/UI';
 import { Meal, useStore } from '@/lib/store';
+import { localDay, parseDay } from '@/lib/dates';
 import { theme } from '@/lib/theme';
 
 type Kind = 'meal' | 'workout' | 'weight' | 'water' | 'steps' | 'legacy-water';
@@ -24,6 +25,7 @@ export default function EditEntry() {
   const draft = { ...Object.fromEntries(Object.entries(entry || {}).map(([key, value]) => [key, String(value)])), ...changes };
   const [error, setError] = useState('');
   const set = (key: string, value: string) => { setError(''); setChanges((old) => ({ ...old, [key]: value })); };
+  const goToHistory = (date?: string) => router.replace({ pathname: '/(tabs)/history', params: { date: date && parseDay(date) ? date : localDay() } });
   const save = () => {
     if (!entry || !draft.date) return;
     if (kind === 'meal') {
@@ -57,7 +59,7 @@ export default function EditEntry() {
       if (count === null || count <= 0) return setError('Enter a step count from 1 to 100000.');
       store.editSteps({ ...entry, date: draft.date, time: draft.time || '12:00', count });
     }
-    router.back();
+    goToHistory(draft.date);
   };
   const remove = () => {
     if (!entry) return;
@@ -68,14 +70,14 @@ export default function EditEntry() {
       else if (kind === 'water') store.removeWater(entry.id);
       else if (kind === 'legacy-water') store.setLegacyWater(entry.date, 0);
       else if (kind === 'steps') store.removeSteps(entry.id);
-      router.back();
+      goToHistory(entry.date);
     };
     if (Platform.OS === 'web') { if (window.confirm('Delete this entry?')) action(); }
     else Alert.alert('Delete entry?', 'This entry will be removed from your history.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: action }]);
   };
   return <Page>
     <Title eyebrow="CORRECT YOUR RECORD" subtitle="Changes to past days update your charts and future reviews.">Edit {kind || 'entry'}</Title>
-    {!entry ? <Card><Text style={ui.muted}>This entry is no longer available.</Text><Button secondary onPress={() => router.back()}>Back</Button></Card> : <Card>
+    {!entry ? <Card><Text style={ui.muted}>This entry is no longer available.</Text><Button secondary onPress={() => goToHistory()}>Back</Button></Card> : <Card>
       <Label>DATE</Label><DaySelector value={draft.date || entry.date} onChange={(value) => set('date', value)} />
       {kind === 'meal' ? <>
         <Label>MEAL TYPE</Label><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{(['breakfast', 'lunch', 'dinner', 'snack'] as const).map((type) => <Button key={type} secondary={draft.type !== type} onPress={() => set('type', type)}>{type}</Button>)}</View>
@@ -86,7 +88,7 @@ export default function EditEntry() {
       </> : kind === 'workout' ? <><Label>ACTIVITY</Label><Input value={draft.name || ''} onChangeText={(value) => set('name', value)} /><Label>TIME</Label><MealTimePicker value={draft.time || '12:00'} onChange={(value) => set('time', value)} /><Label>DURATION (MIN)</Label><Input value={draft.minutes || ''} onChangeText={(value) => set('minutes', value)} keyboardType="number-pad" /><Label>NOTES</Label><Input value={draft.note || ''} onChangeText={(value) => set('note', value)} multiline /></> :
         <><Label>{kind === 'weight' ? 'WEIGHT (KG)' : kind === 'water' || kind === 'legacy-water' ? 'WATER (ML)' : 'STEPS'}</Label><Input value={draft[kind === 'weight' ? 'kg' : kind === 'water' || kind === 'legacy-water' ? 'ml' : 'count'] || ''} onChangeText={(value) => set(kind === 'weight' ? 'kg' : kind === 'water' || kind === 'legacy-water' ? 'ml' : 'count', value)} keyboardType="decimal-pad" />{kind !== 'weight' && kind !== 'legacy-water' ? <><Label>TIME</Label><MealTimePicker value={draft.time || '12:00'} onChange={(value) => set('time', value)} /></> : null}</>}
       {error ? <Text accessibilityRole="alert" style={{ color: theme.red }}>{error}</Text> : null}
-      <Button onPress={save}>Save changes</Button><Button secondary onPress={remove}>Delete entry</Button><Button secondary onPress={() => router.back()}>Cancel</Button>
+      <Button onPress={save}>Save changes</Button><Button secondary onPress={remove}>Delete entry</Button><Button secondary onPress={() => goToHistory(entry.date)}>Cancel</Button>
     </Card>}
   </Page>;
 }

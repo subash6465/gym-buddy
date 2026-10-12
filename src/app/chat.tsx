@@ -30,7 +30,7 @@ export default function Chat() {
     const workouts = store.workouts.filter((x) => x.date === date);
     const targets = planTargets(store.profile, store.weighIns[0]?.kg, auth.plan);
     const context = JSON.stringify({ date, goal: store.profile.goal, workoutLocation: store.profile.setting,
-      fitnessPlan: store.profile.fitnessPlan, allergies: store.profile.allergies, concerns: store.profile.concerns,
+      allergies: store.profile.allergies, concerns: store.profile.concerns,
       todaysMeals: meals.map((x) => ({ name: x.name, calories: x.calories, protein: x.protein })),
       todaysWorkouts: workouts.map((x) => ({ name: x.name, minutes: x.minutes })),
       waterMl: store.water[date] || 0, steps: store.stepEntries.filter((x) => x.date === date).reduce((sum, x) => sum + x.count, 0),
@@ -43,7 +43,7 @@ export default function Chat() {
   return <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }} edges={['top', 'bottom']}>
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}>
       <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderColor: theme.line, gap: 12 }}>
-        <Pressable onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Close chat" style={{ padding: 8 }}><Text style={{ color: theme.accent, fontSize: 16, fontWeight: '800' }}>‹ Back</Text></Pressable>
+        <Pressable onPress={() => router.replace('/(tabs)')} accessibilityRole="button" accessibilityLabel="Close chat" style={{ padding: 8 }}><Text style={{ color: theme.accent, fontSize: 16, fontWeight: '800' }}>‹ Back</Text></Pressable>
         <Icon name="chat" color={theme.accent} size={22} /><Text style={{ color: theme.text, fontSize: 20, fontWeight: '800' }}>Gym Buddy AI</Text>
       </View>
       <ScrollView ref={scroll} contentContainerStyle={{ padding: 18, gap: 12, flexGrow: 1 }} onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: true })} keyboardShouldPersistTaps="handled">

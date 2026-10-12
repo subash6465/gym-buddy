@@ -29,7 +29,6 @@ export default function Plan() {
           <Text style={ui.muted}>Protein {plan.proteinGrams} g · Drinks {plan.waterMl.toLocaleString()} ml · Steps {plan.stepsTarget.toLocaleString()}</Text>
         </> : <Text style={ui.muted}>Personal calorie and drink goals are paused for this profile. Steps starting point: {plan.stepsTarget.toLocaleString()} per day.</Text>}
       </Card>
-      {profile.fitnessPlan ? <Card><Text style={{ color: theme.accent, fontSize: 11, fontWeight: '800' }}>YOUR ORIGINAL PLAN</Text><Text style={ui.muted}>{profile.fitnessPlan}</Text></Card> : null}
       <Text style={{ color: theme.text, fontSize: 19, fontWeight: '800' }}>This week</Text>
       {plan.days.map((day) => <Card key={day.day} style={{ flexDirection: 'row', gap: 12 }}>
         <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: theme.cardAlt, alignItems: 'center', justifyContent: 'center' }}><Icon name={day.isRest ? 'water' : 'workout'} color={theme.accent} size={20} /></View>

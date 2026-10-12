@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 import DaySelector from '@/components/DaySelector';
 import { Button, Card, Page, Row, Title, ui } from '@/components/UI';
@@ -7,6 +7,7 @@ import { today, useStore } from '@/lib/store';
 import { planTargets } from '@/lib/targets';
 import { useAuth } from '@/lib/auth';
 import { theme } from '@/lib/theme';
+import { parseDay } from '@/lib/dates';
 
 const number = (value: number) => Math.round(value).toLocaleString();
 const displayDate = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
@@ -15,9 +16,15 @@ const displayTime = (time: string) => { const [hours, minutes] = time.split(':')
 type Event = { id: string; time?: string; title: string; detail: string; kind: string; entryKind?: 'meal' | 'workout' | 'weight' | 'water' | 'steps' | 'legacy-water' };
 
 export default function History() {
+  const { date } = useLocalSearchParams<{ date?: string }>();
+  const initialDate = date && parseDay(date) ? date : today();
+  return <HistoryContent key={initialDate} initialDate={initialDate} />;
+}
+
+function HistoryContent({ initialDate }: { initialDate: string }) {
   const store = useStore();
   const auth = useAuth();
-  const [selected, setSelected] = useState(today());
+  const [selected, setSelected] = useState(initialDate);
   const dates = useMemo(() => [...new Set([
     today(), ...store.meals.map((x) => x.date), ...store.workouts.map((x) => x.date),
     ...store.weighIns.map((x) => x.date), ...Object.keys(store.water),

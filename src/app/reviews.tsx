@@ -26,7 +26,7 @@ export default function ReviewsScreen() {
   };
   return <Page>
     <Title eyebrow="YOUR LONG VIEW" subtitle="One saved AI review for each completed period. Past reviews stay available for your coach chat.">Progress reviews</Title>
-    <Button secondary onPress={() => router.back()}>Back</Button>
+    <Button secondary onPress={() => router.replace('/(tabs)')}>Back</Button>
     <View style={{ flexDirection: 'row', gap: 8 }}>{(['weekly', 'monthly'] as const).map((option) => <Pressable key={option} onPress={() => { setKind(option); setOpen(''); }} accessibilityRole="button" accessibilityState={{ selected: option === kind }} style={{ flex: 1, padding: 13, borderRadius: 13, alignItems: 'center', backgroundColor: option === kind ? theme.accent : theme.cardAlt }}><Text style={{ color: option === kind ? theme.ink : theme.text, fontWeight: '800' }}>{option === 'weekly' ? 'Weekly' : 'Monthly'}</Text></Pressable>)}</View>
     <Text style={ui.muted}>Weekly periods start on your first setup day. Monthly periods run from that date to the day before the same date next month. Reviews generate after a period ends when the app opens online.</Text>
     {error ? <Text accessibilityRole="alert" style={{ color: theme.red }}>{error}</Text> : null}

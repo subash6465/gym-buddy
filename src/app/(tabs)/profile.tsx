@@ -88,7 +88,7 @@ export default function ProfileScreen() {
   const targets = planTargets(profile, latest?.kg, auth.plan, now);
   const height = Number(profile.heightCm);
   const bmi = latest && height > 0 ? latest.kg / ((height / 100) ** 2) : null;
-  const changedFields = (Object.keys(profile) as (keyof Profile)[]).filter((key) => key !== 'weightKg' && draft[key] !== profile[key]);
+  const changedFields = (Object.keys(profile) as (keyof Profile)[]).filter((key) => key !== 'weightKg' && key !== 'fitnessPlan' && draft[key] !== profile[key]);
   if (draftWeight && Number(draftWeight) !== (latest?.kg || profile.weightKg)) changedFields.push('weightKg');
   return <Page>
     <Title eyebrow="YOUR JOURNEY" subtitle={`Signed in as ${auth.user.email}. Your profile is saved to your account.`}>Made for your goals.</Title>
@@ -98,7 +98,7 @@ export default function ProfileScreen() {
         ['Latest weight', latest ? `${latest.kg} kg${bmi ? ` · BMI ${bmi.toFixed(1)}` : ''}` : 'No weigh-in'],
         ['Goal', profile.goal], ['Training location', profile.setting], ['Usual activity', profile.activity], ['Training days', `${profile.daysPerWeek} per week`],
         ['Pace', profile.pace], ['Equation reference', profile.equation || 'Skipped'], ['Special dietary care', profile.nutritionCaution ? 'Yes' : 'No'],
-        ['Fitness schedule', profile.fitnessPlan || 'Not entered'], ['Allergies or foods to avoid', profile.allergies || 'Not entered'], ['Concerns', profile.concerns || 'Not entered'],
+        ['Allergies or foods to avoid', profile.allergies || 'Not entered'], ['Concerns', profile.concerns || 'Not entered'],
       ] as const).map(([label, value]) => <View key={label} style={{ borderTopWidth: 1, borderColor: theme.line, paddingTop: 9 }}><Label>{label.toUpperCase()}</Label><Text style={{ color: theme.text, marginTop: 3 }}>{value}</Text></View>)}
       <Button secondary onPress={startEdit}>Edit profile and goals</Button>
     </Card> : <Card><Text style={{ color: theme.text, fontSize: 20, fontWeight: '800' }}>Edit all preferences</Text>
@@ -114,7 +114,6 @@ export default function ProfileScreen() {
       <Label>PACE</Label><Choice options={[["light", "Light"], ["moderate", "Moderate"], ["aggressive", "Aggressive"]] as const} value={draft.pace} onChange={(value) => setDraftField('pace', value)} />
       <Label>METABOLIC EQUATION REFERENCE</Label><Choice options={[["female", "Female equation"], ["male", "Male equation"], ["", "Skip"]] as const} value={draft.equation} onChange={(value) => setDraftField('equation', value)} />
       <Pressable onPress={() => setDraftField('nutritionCaution', !draft.nutritionCaution)} accessibilityRole="checkbox" accessibilityState={{ checked: draft.nutritionCaution }} style={{ padding: 14, backgroundColor: theme.cardAlt, borderRadius: 12 }}><Text style={{ color: theme.text }}>{draft.nutritionCaution ? '☑' : '□'} Pregnancy, breastfeeding, or a condition needing a special diet</Text></Pressable>
-      <Label>FITNESS PLAN OR SCHEDULE</Label><Input value={draft.fitnessPlan} onChangeText={(value) => setDraftField('fitnessPlan', value)} multiline />
       <Label>ALLERGIES OR FOODS TO AVOID</Label><Input value={draft.allergies} onChangeText={(value) => setDraftField('allergies', value)} multiline />
       <Label>INJURIES, PAIN OR OTHER CONCERNS</Label><Input value={draft.concerns} onChangeText={(value) => setDraftField('concerns', value)} multiline />
       {profileError ? <Text accessibilityRole="alert" style={{ color: theme.red }}>{profileError}</Text> : null}
