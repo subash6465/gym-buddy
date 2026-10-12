@@ -50,7 +50,7 @@ function validateResult(result) {
   return result;
 }
 
-export async function chat(messages, context, provider, apiKey, reviews = []) {
+export async function chat(messages, context, provider, apiKey, reviews = [], deadline = Date.now() + 75_000) {
   if (!Array.isArray(messages) || messages.length < 1 || messages.length > 20 ||
       messages.some((item) => !item || !['user', 'assistant'].includes(item.role) || typeof item.content !== 'string' || !item.content.trim() || item.content.length > 2000) ||
       messages.at(-1).role !== 'user' || typeof context !== 'string' || context.length > 3000) {
@@ -60,11 +60,11 @@ export async function chat(messages, context, provider, apiKey, reviews = []) {
   const { catalog, selected } = reviewsForQuestion(messages.at(-1).content, reviews);
   const fullInstructions = `${instructions}\nApp context: ${context}\nSaved review periods: ${JSON.stringify(catalog)}\nRelevant saved reviews: ${JSON.stringify(selected.slice(0, 6))}. Use saved reviews as historical reference; distinguish missing logs from inactivity. If a requested period has no relevant saved review, say so.`;
   try {
-    const raw = await generate({ provider, apiKey, task: 'chat', instructions: fullInstructions, messages, jsonSchema: chatSchema });
+    const raw = await generate({ provider, apiKey, task: 'chat', instructions: fullInstructions, messages, jsonSchema: chatSchema, deadline });
     return parseChatResult(raw);
   } catch (error) {
-    if (error.providerStatus !== 400 && !/invalid reply/.test(error.message)) throw error;
-    const raw = await generate({ provider, apiKey, task: 'chat', instructions: `${fullInstructions}\nReturn a JSON object with reply and action. Action must have kind (none, water, steps, weight, or plan), mode (set or add), date (YYYY-MM-DD or empty), and numeric value. Return no Markdown or extra text.`, messages });
+    if (!/invalid reply/.test(error.message)) throw error;
+    const raw = await generate({ provider, apiKey, task: 'chat', instructions: `${fullInstructions}\nReturn a JSON object with reply and action. Action must have kind (none, water, steps, weight, or plan), mode (set or add), date (YYYY-MM-DD or empty), and numeric value. Return no Markdown or extra text.`, messages, deadline });
     return parseChatResult(raw);
   }
 }
@@ -137,14 +137,15 @@ const server = createServer(async (req, res) => {
       if (req.url === '/account' && req.method === 'DELETE') return send(res, 200, deleteAccount(req.headers.authorization));
       if (req.url === '/ai-config' && req.method === 'PUT') { requireVerifiedKey(body.provider, body.apiKey, body.verificationTicket); return send(res, 200, saveAiConfig(req.headers.authorization, body.provider, body.apiKey)); }
       if (req.url === '/chat' && req.method === 'POST') {
+        const deadline = Date.now() + 80_000;
         const config = getAiConfig(req.headers.authorization);
-        const result = await chat(body.messages, body.context, config.provider, config.apiKey, listReviews(req.headers.authorization));
+        const result = await chat(body.messages, body.context, config.provider, config.apiKey, listReviews(req.headers.authorization), deadline);
         if (result.action?.kind !== 'plan') return send(res, 200, result);
         const account = getAccount(req.headers.authorization);
         if (!account.profile) return send(res, 409, { error: 'Complete onboarding first.' });
         if (body.weightKg !== undefined && (!Number.isFinite(body.weightKg) || body.weightKg < 25 || body.weightKg > 400)) return send(res, 400, { error: 'Enter a valid current weight before revising the plan.' });
         const profile = body.weightKg ? { ...account.profile, weightKg: body.weightKg } : account.profile;
-        const plan = await createPlan(profile, config, body.messages, account.plan);
+        const plan = await createPlan(profile, config, body.messages, account.plan, deadline);
         const ticket = stagePlan(account.user.id, account.plan, plan, account.profile);
         return send(res, 200, { reply: ticket ? 'I prepared a revised week. Review it below and choose Approve or Reject.' : 'Your current plan already fits that request, so nothing changed.',
           action: null, planPreview: ticket ? { plan, prior: account.plan, ticket } : null });
