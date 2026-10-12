@@ -77,10 +77,12 @@ export async function generate({ provider, apiKey, instructions, messages, image
   } else {
     url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(googleModels[task]())}:generateContent`;
     headers = { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' };
+    const generationConfig = { ...(task === 'chat' && googleModels.chat().startsWith('gemma-4-') ? { thinkingConfig: { thinkingLevel: 'minimal' } } : {}),
+      ...(jsonSchema ? { responseFormat: { text: { mimeType: 'application/json', schema: jsonSchema } } } : {}) };
     body = { systemInstruction: { parts: [{ text: instructions }] },
       contents: messages.map((message, index) => ({ role: message.role === 'assistant' ? 'model' : 'user', parts: [
         { text: message.content }, ...(index === last && photo ? [{ inlineData: { mimeType: photo.mimeType, data: photo.data } }] : []),
-      ] })), ...(jsonSchema ? { generationConfig: { responseFormat: { text: { mimeType: 'application/json', schema: jsonSchema } } } } : {}) };
+      ] })), ...(Object.keys(generationConfig).length ? { generationConfig } : {}) };
   }
   let response;
   try {
@@ -89,14 +91,14 @@ export async function generate({ provider, apiKey, instructions, messages, image
     if (provider !== 'gemini' || !jsonSchema || error.providerStatus !== 400) throw error;
     const fallbackBody = { ...body,
       systemInstruction: { parts: [{ text: `${instructions}\nReturn only a JSON object matching this schema: ${JSON.stringify(jsonSchema)}` }] },
-      generationConfig: { responseMimeType: 'application/json' } };
+      generationConfig: { ...(body.generationConfig?.thinkingConfig ? { thinkingConfig: body.generationConfig.thinkingConfig } : {}), responseMimeType: 'application/json' } };
     response = await sendProviderRequest(provider, url, headers, fallbackBody);
   }
   const payload = await response.json();
   const text = provider === 'openai'
     ? payload.output?.flatMap((item) => item.type === 'message' ? item.content || [] : []).filter((item) => item.type === 'output_text').map((item) => item.text).join('\n')
     : provider === 'claude' ? payload.content?.filter((item) => item.type === 'text').map((item) => item.text).join('\n')
-      : payload.candidates?.[0]?.content?.parts?.filter((item) => typeof item.text === 'string').map((item) => item.text).join('\n');
+      : payload.candidates?.[0]?.content?.parts?.filter((item) => item.thought !== true && typeof item.text === 'string').map((item) => item.text).join('\n');
   if (!text?.trim()) throw Object.assign(new Error(`${provider} did not return a reply. Try again.`), { status: 502 });
   return text.trim();
 }

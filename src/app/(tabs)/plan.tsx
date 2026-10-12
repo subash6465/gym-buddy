@@ -38,7 +38,7 @@ export default function Plan() {
           {day.activities.map((activity, index) => <Text key={`${day.day}-${index}`} style={ui.muted}>• {activity}</Text>)}
         </View>
       </Card>)}
-      <Card><Text style={{ color: theme.text, fontSize: 18, fontWeight: '800' }}>Suggestions</Text><Text style={ui.muted}>{plan.suggestions}</Text><Text style={[ui.muted, { fontSize: 11 }]}>Chat with Gym Buddy AI and use “Update my plan using this chat” to revise this week.</Text></Card>
+      <Card><Text style={{ color: theme.text, fontSize: 18, fontWeight: '800' }}>Suggestions</Text><Text style={ui.muted}>{plan.suggestions}</Text><Text style={[ui.muted, { fontSize: 11 }]}>Ask Gym Buddy AI in chat to revise this week. Review and approve its proposed plan there.</Text></Card>
     </> : <Card><Text style={ui.muted}>Generate a weekly plan from your saved profile and training preferences.</Text>
       {error ? <Text accessibilityRole="alert" style={{ color: theme.red }}>{error}</Text> : null}
       <Button disabled={generating} onPress={() => { setGenerating(true); setError(''); auth.revisePlan([{ role: 'user', content: 'Create a practical weekly plan from my saved profile and preferences.' }]).catch((cause) => setError(cause instanceof Error ? cause.message : 'Could not generate a plan.')).finally(() => setGenerating(false)); }}>{generating ? 'Building your plan…' : 'Generate my plan'}</Button>

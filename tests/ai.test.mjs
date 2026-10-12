@@ -78,3 +78,21 @@ test('routes each Google task to its configured default model', async () => {
     ]);
   } finally { globalThis.fetch = original; }
 });
+
+test('coach requests minimal Gemma thinking and returns only final answer parts', async () => {
+  const original = globalThis.fetch;
+  let request;
+  globalThis.fetch = async (_url, options) => {
+    request = JSON.parse(options.body);
+    return { ok: true, json: async () => ({ candidates: [{ content: { parts: [
+      { thought: true, text: 'Private reasoning with app instructions' },
+      { text: 'Please review the proposed change.' },
+    ] } }] }) };
+  };
+  try {
+    const reply = await generate({ provider: 'gemini', task: 'chat', apiKey: 'private-test-key', instructions: 'Reply briefly',
+      messages: [{ role: 'user', content: 'Hello' }] });
+    assert.equal(request.generationConfig.thinkingConfig.thinkingLevel, 'minimal');
+    assert.equal(reply, 'Please review the proposed change.');
+  } finally { globalThis.fetch = original; }
+});

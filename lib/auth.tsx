@@ -10,7 +10,7 @@ import type { Review, ReviewJob } from './reviews';
 
 export type AiProvider = 'openai' | 'claude' | 'gemini';
 export type ChatAction = { kind: 'water' | 'steps' | 'weight'; mode: 'set' | 'add'; date: string; value: number };
-export type ChatReply = { reply: string; action: ChatAction | null };
+export type ChatReply = { reply: string; action: ChatAction | null; planPreview?: { plan: AiPlan; prior: AiPlan | null; ticket: string } | null };
 type Account = { user: { id: string; email: string }; profile: Profile | null; startedOn: string | null; ai: { provider: AiProvider | null; configured: boolean }; plan: AiPlan | null };
 type Auth = Account & {
   ready: boolean;
@@ -20,12 +20,11 @@ type Auth = Account & {
   estimateMeal: (description: string, imageDataUrl: string | null) => Promise<MealEstimate>;
   completeOnboarding: (profile: Profile) => Promise<void>;
   revisePlan: (messages: { role: 'user' | 'assistant'; content: string }[], weightKg?: number) => Promise<void>;
-  previewPlan: (messages: { role: 'user' | 'assistant'; content: string }[], weightKg?: number) => Promise<{ plan: AiPlan; ticket: string | null }>;
   approvePlan: (ticket: string) => Promise<void>;
   recomputeProfile: (profile: Profile) => Promise<void>;
   signOut: () => Promise<void>;
   deleteAccount: (clearLocalData: () => Promise<void>) => Promise<void>;
-  chat: (messages: { role: 'user' | 'assistant'; content: string }[], context: string) => Promise<ChatReply>;
+  chat: (messages: { role: 'user' | 'assistant'; content: string }[], context: string, weightKg?: number) => Promise<ChatReply>;
   reviews: Review[];
   refreshReviews: () => Promise<Review[]>;
   generateReview: (job: ReviewJob) => Promise<Review>;
@@ -44,7 +43,7 @@ async function request<T>(path: string, method: string, token?: string, body?: o
   let response: Response;
   const base = apiUrl();
   const controller = new AbortController();
-  const timeoutMs = ['/chat', '/estimate-meal', '/verify-ai-key', '/onboarding', '/plan/revise', '/plan/preview', '/profile/recompute', '/reviews'].includes(path) && method !== 'GET' ? 90_000 : 8000;
+  const timeoutMs = ['/chat', '/estimate-meal', '/verify-ai-key', '/onboarding', '/plan/revise', '/profile/recompute', '/reviews'].includes(path) && method !== 'GET' ? 90_000 : 8000;
   let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
     response = await Promise.race<Response>([fetch(`${base}${path}`, {
@@ -113,10 +112,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const result = await request<{ plan: AiPlan }>('/plan/revise', 'POST', token, { messages, weightKg });
       setAccount((old) => ({ ...old, plan: result.plan }));
     },
-    previewPlan: async (messages, weightKg) => {
-      if (!token) throw new Error('Sign in again to continue.');
-      return request<{ plan: AiPlan; ticket: string | null }>('/plan/preview', 'POST', token, { messages, weightKg });
-    },
     approvePlan: async (ticket) => {
       if (!token) throw new Error('Sign in again to continue.');
       const result = await request<{ plan: AiPlan }>('/plan/approve', 'POST', token, { ticket });
@@ -145,9 +140,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setReviews([]);
       }
     },
-    chat: async (messages, context) => {
+    chat: async (messages, context, weightKg) => {
       if (!token) throw new Error('Sign in again to continue.');
-      return request<ChatReply>('/chat', 'POST', token, { messages, context });
+      return request<ChatReply>('/chat', 'POST', token, { messages, context, weightKg });
     },
     reviews,
     refreshReviews: async () => {
