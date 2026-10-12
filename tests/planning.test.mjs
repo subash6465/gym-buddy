@@ -57,7 +57,9 @@ test('plan generation sends all relevant onboarding choices to the selected prov
 test('Gemini plan generation falls back to JSON mode when its strict schema is rejected', async () => {
   const original = globalThis.fetch;
   const requests = [];
-  globalThis.fetch = async (_url, options) => {
+  const urls = [];
+  globalThis.fetch = async (url, options) => {
+    urls.push(url);
     requests.push(JSON.parse(options.body));
     return requests.length === 1 ? { ok: false, status: 400 } : {
       ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(raw) }] } }] }),
@@ -66,6 +68,7 @@ test('Gemini plan generation falls back to JSON mode when its strict schema is r
   try {
     const plan = await createPlan(profile, { provider: 'gemini', apiKey: 'private-test-key' });
     assert.equal(plan.days.length, 7);
+    assert.ok(urls.every((url) => /models\/gemini-3\.8-flash:generateContent$/.test(url)));
     assert.ok(requests[0].generationConfig.responseFormat.text.schema);
     assert.equal(requests[1].generationConfig.responseMimeType, 'application/json');
     assert.equal(requests[1].generationConfig.responseFormat, undefined);

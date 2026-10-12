@@ -1,7 +1,12 @@
 const models = {
   openai: () => process.env.OPENAI_MODEL || 'gpt-4o-mini',
   claude: () => process.env.CLAUDE_MODEL || 'claude-haiku-5-5',
-  gemini: () => process.env.GEMINI_MODEL || 'gemini-3.8-flash',
+};
+const googleModels = {
+  verification: () => process.env.GEMINI_VERIFICATION_MODEL || 'gemma-4-26b-a4b-it',
+  planning: () => process.env.GEMINI_PLANNING_MODEL || process.env.GEMINI_MODEL || 'gemini-3.8-flash',
+  chat: () => process.env.GEMINI_CHAT_MODEL || 'gemma-4-31b-it',
+  meal: () => process.env.GEMINI_MEAL_MODEL || 'gemini-3.5-flash-lite',
 };
 const image = (dataUrl) => {
   if (!dataUrl) return null;
@@ -46,8 +51,10 @@ async function sendProviderRequest(provider, url, headers, body) {
   throw Object.assign(new Error(`${provider} is unavailable. Try again shortly.`), { status: 503 });
 }
 
-export async function generate({ provider, apiKey, instructions, messages, imageDataUrl, jsonSchema }) {
-  if (!models[provider] || !apiKey) throw Object.assign(new Error('Set up an AI provider and key when you sign in.'), { status: 409 });
+export async function generate({ provider, apiKey, instructions, messages, imageDataUrl, jsonSchema, task }) {
+  if (!(provider === 'gemini' ? googleModels[task] : models[provider]) || !apiKey) {
+    throw Object.assign(new Error('Set up an AI provider and key when you sign in.'), { status: 409 });
+  }
   const photo = image(imageDataUrl);
   const last = messages.length - 1;
   let url; let headers; let body;
@@ -67,7 +74,7 @@ export async function generate({ provider, apiKey, instructions, messages, image
         ? [{ type: 'text', text: message.content }, { type: 'image', source: { type: 'base64', media_type: photo.mimeType, data: photo.data } }]
         : message.content })), ...(jsonSchema ? { output_config: { format: { type: 'json_schema', schema: jsonSchema } } } : {}) };
   } else {
-    url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(models.gemini())}:generateContent`;
+    url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(googleModels[task]())}:generateContent`;
     headers = { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' };
     body = { systemInstruction: { parts: [{ text: instructions }] },
       contents: messages.map((message, index) => ({ role: message.role === 'assistant' ? 'model' : 'user', parts: [

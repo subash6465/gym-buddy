@@ -78,7 +78,7 @@ export async function createPlan(profile, config, conversation = [], previousPla
   }, estimatedMaintenanceCalories: guide?.maintenance || 0, estimatedRestingCalories: guide?.resting || 0,
   previousPlan: previousPlan ? { summary: previousPlan.summary, days: previousPlan.days } : null,
   conversation: conversation.slice(-12) };
-  const text = await generate({ ...config, instructions, jsonSchema: planSchema,
+  const text = await generate({ ...config, task: 'planning', instructions, jsonSchema: planSchema,
     messages: [{ role: 'user', content: JSON.stringify(input) }] });
   try { return normalizePlan(JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, '')), profile); }
   catch (error) { if (error.status) throw error; fail(); }
