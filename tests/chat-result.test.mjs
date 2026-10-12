@@ -9,6 +9,15 @@ test('coach output can propose a water change without applying it', () => {
   });
 });
 
+test('coach output preserves the distinction between adding water and setting a daily total', () => {
+  for (const mode of ['add', 'set']) {
+    const action = { kind: 'water', mode, date: '2026-10-12', value: 3000 };
+    assert.deepEqual(parseChatResult(JSON.stringify({ reply: 'Review this change.', action })), {
+      reply: 'I prepared the change you requested. Review it below before anything is saved.', action,
+    });
+  }
+});
+
 test('invalid coach actions are discarded while the reply remains usable', () => {
   for (const action of [
     { kind: 'water', mode: 'set', date: '2026-10-12', value: 999999 },
