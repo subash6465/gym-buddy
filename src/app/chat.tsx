@@ -55,7 +55,7 @@ export default function Chat() {
       {messages.some((message) => message.role === 'user') ? <Pressable onPress={async () => {
         if (revising || busy) return;
         setRevising(true); setPlanMessage('');
-        try { await auth.revisePlan(messages.slice(-12)); setPlanMessage('Your weekly plan was updated. Open the Plan tab to review it.'); }
+        try { await auth.revisePlan(messages.slice(-12), store.weighIns[0]?.kg); setPlanMessage('Your weekly plan was updated. Open the Plan tab to review it.'); }
         catch (cause) { setPlanMessage(cause instanceof Error ? cause.message : 'Could not update your plan.'); }
         finally { setRevising(false); }
       }} disabled={revising || busy} accessibilityRole="button" style={{ marginHorizontal: 12, marginBottom: 5, padding: 11, borderRadius: 12, backgroundColor: theme.cardAlt, alignItems: 'center', opacity: revising || busy ? .5 : 1 }}><Text style={{ color: theme.accent, fontWeight: '800' }}>{revising ? 'Updating your plan…' : 'Update my plan using this chat'}</Text></Pressable> : null}

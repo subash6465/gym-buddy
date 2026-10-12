@@ -7,6 +7,7 @@ const googleModels = {
   planning: () => process.env.GEMINI_PLANNING_MODEL || process.env.GEMINI_MODEL || 'gemini-3.8-flash',
   chat: () => process.env.GEMINI_CHAT_MODEL || 'gemma-4-31b-it',
   meal: () => process.env.GEMINI_MEAL_MODEL || 'gemini-3.5-flash-lite',
+  review: () => process.env.GEMINI_REVIEW_MODEL || 'gemini-3.8-flash',
 };
 const image = (dataUrl) => {
   if (!dataUrl) return null;
@@ -65,7 +66,7 @@ export async function generate({ provider, apiKey, instructions, messages, image
       input: messages.map((message, index) => ({ role: message.role, content: index === last && photo
         ? [{ type: 'input_text', text: message.content }, { type: 'input_image', image_url: imageDataUrl, detail: 'low' }]
         : message.content })),
-      ...(jsonSchema ? { text: { format: { type: 'json_schema', name: 'meal_nutrition_estimate', strict: true, schema: jsonSchema } } } : {}) };
+      ...(jsonSchema ? { text: { format: { type: 'json_schema', name: `${task || 'structured'}_result`, strict: true, schema: jsonSchema } } } : {}) };
   } else if (provider === 'claude') {
     url = 'https://api.anthropic.com/v1/messages';
     headers = { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' };

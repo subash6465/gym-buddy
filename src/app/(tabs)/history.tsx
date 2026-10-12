@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
+import { router } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
-import { Card, Page, Row, Title, ui } from '@/components/UI';
+import DaySelector from '@/components/DaySelector';
+import { Button, Card, Page, Row, Title, ui } from '@/components/UI';
 import { today, useStore } from '@/lib/store';
 import { planTargets } from '@/lib/targets';
 import { useAuth } from '@/lib/auth';
@@ -10,7 +12,7 @@ const number = (value: number) => Math.round(value).toLocaleString();
 const displayDate = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
 const displayTime = (time: string) => { const [hours, minutes] = time.split(':').map(Number); return new Date(2000, 0, 1, hours, minutes).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }); };
 
-type Event = { id: string; time?: string; title: string; detail: string; kind: string };
+type Event = { id: string; time?: string; title: string; detail: string; kind: string; entryKind?: 'meal' | 'workout' | 'weight' | 'water' | 'steps' | 'legacy-water' };
 
 export default function History() {
   const store = useStore();
@@ -33,27 +35,28 @@ export default function History() {
   const weight = store.weighIns.find((x) => x.date <= selected)?.kg;
   const targets = planTargets(store.profile, weight, auth.plan, new Date(`${selected}T12:00:00`));
   const events: Event[] = ([
-    ...meals.map((x) => ({ id: x.id, time: x.time, kind: x.type.toUpperCase(), title: x.name, detail: `${number(x.calories)} kcal · Protein ${number(x.protein)} g · Carbs ${number(x.carbs)} g · Fat ${number(x.fat)} g\nFibre ${number(x.fibre)} g · Sugar ${number(x.sugar)} g${x.note ? `\n${x.note}` : ''}` })),
-    ...workouts.map((x) => ({ id: x.id, time: x.time, kind: 'WORKOUT', title: x.name, detail: `${number(x.minutes)} min${x.note ? ` · ${x.note}` : ''}` })),
-    ...waters.map((x) => ({ id: x.id, time: x.time, kind: 'WATER', title: `${number(x.ml)} ml water`, detail: 'Drink logged' })),
-    ...steps.map((x) => ({ id: x.id, time: x.time, kind: 'STEPS', title: `${number(x.count)} steps`, detail: 'Steps logged' })),
-    ...weighIns.map((x) => ({ id: x.id, kind: 'WEIGH-IN', title: `${x.kg} kg`, detail: 'Weight recorded; time was not saved' })),
+    ...meals.map((x) => ({ id: x.id, time: x.time, kind: x.type.toUpperCase(), entryKind: 'meal' as const, title: x.name, detail: `${number(x.calories)} kcal · Protein ${number(x.protein)} g · Carbs ${number(x.carbs)} g · Fat ${number(x.fat)} g\nFibre ${number(x.fibre)} g · Sugar ${number(x.sugar)} g${x.note ? `\n${x.note}` : ''}` })),
+    ...workouts.map((x) => ({ id: x.id, time: x.time, kind: 'WORKOUT', entryKind: 'workout' as const, title: x.name, detail: `${number(x.minutes)} min${x.note ? ` · ${x.note}` : ''}` })),
+    ...waters.map((x) => ({ id: x.id, time: x.time, kind: 'WATER', entryKind: 'water' as const, title: `${number(x.ml)} ml water`, detail: 'Drink logged' })),
+    ...steps.map((x) => ({ id: x.id, time: x.time, kind: 'STEPS', entryKind: 'steps' as const, title: `${number(x.count)} steps`, detail: 'Steps logged' })),
+    ...weighIns.map((x) => ({ id: x.id, kind: 'WEIGH-IN', entryKind: 'weight' as const, title: `${x.kg} kg`, detail: 'Weight recorded; time was not saved' })),
   ] as Event[]).sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99') || a.kind.localeCompare(b.kind));
   const legacyWater = Math.max(0, water - waters.reduce((sum, entry) => sum + entry.ml, 0));
-  if (legacyWater) events.push({ id: 'legacy-water', kind: 'WATER', title: `${number(legacyWater)} ml water`, detail: 'Logged before water timestamps were available' });
+  if (legacyWater) events.push({ id: selected, kind: 'WATER', entryKind: 'legacy-water', title: `${number(legacyWater)} ml water`, detail: 'Logged before water timestamps were available' });
   return <Page>
     <Title eyebrow="YOUR DAILY RECORD" subtitle="Choose a day to see its entries in time order and a full summary.">History</Title>
     <View style={{ gap: 8 }}>
-      <Text style={{ color: theme.text, fontSize: 18, fontWeight: '800' }}>Days</Text>
+      <Text style={{ color: theme.text, fontSize: 18, fontWeight: '800' }}>Recent days</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-        {dates.map((date) => <Pressable key={date} onPress={() => setSelected(date)} accessibilityRole="button" accessibilityState={{ selected: date === selected }} style={{ borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: date === selected ? theme.accent : theme.line, backgroundColor: date === selected ? 'rgba(118,240,219,0.16)' : theme.card }}><Text style={{ color: date === selected ? theme.accent : theme.text, fontWeight: '700' }}>{date === today() ? 'Today' : new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</Text></Pressable>)}
+        {dates.slice(0, 14).map((date) => <Pressable key={date} onPress={() => setSelected(date)} accessibilityRole="button" accessibilityState={{ selected: date === selected }} style={{ borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: date === selected ? theme.accent : theme.line, backgroundColor: date === selected ? 'rgba(118,240,219,0.16)' : theme.card }}><Text style={{ color: date === selected ? theme.accent : theme.text, fontWeight: '700' }}>{date === today() ? 'Today' : new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</Text></Pressable>)}
       </View>
     </View>
+    <Card><Text style={{ color: theme.text, fontWeight: '800' }}>Jump to any day</Text><DaySelector value={selected} onChange={setSelected} /><Button onPress={() => router.push({ pathname: '/(tabs)/log', params: { date: selected } })}>Add an entry for {selected}</Button></Card>
     <Text style={{ color: theme.text, fontSize: 21, fontWeight: '800' }}>{displayDate(selected)}</Text>
     <Card><Text style={{ color: theme.accent, fontSize: 11, letterSpacing: 1, fontWeight: '800' }}>TIMELINE</Text>
       {events.length ? events.map((event) => <View key={event.id} style={{ borderTopWidth: 1, borderColor: theme.line, paddingTop: 12, gap: 3 }}>
         <Row><Text style={{ color: theme.accent, fontSize: 12, fontWeight: '800', minWidth: 70 }}>{event.time ? displayTime(event.time) : 'Time n/a'}</Text><Text style={{ color: theme.muted, fontSize: 10, fontWeight: '800' }}>{event.kind}</Text></Row>
-        <Text style={{ color: theme.text, fontSize: 16, fontWeight: '800' }}>{event.title}</Text><Text style={ui.muted}>{event.detail}</Text>
+        <Row><Text style={{ color: theme.text, fontSize: 16, fontWeight: '800', flex: 1 }}>{event.title}</Text>{event.entryKind ? <Pressable accessibilityRole="button" accessibilityLabel={`Edit ${event.kind.toLowerCase()} entry`} onPress={() => router.push({ pathname: '/edit-entry', params: { kind: event.entryKind, id: event.id } })}><Text style={{ color: theme.accent, fontWeight: '800' }}>Edit</Text></Pressable> : null}</Row><Text style={ui.muted}>{event.detail}</Text>
       </View>) : <Text style={ui.muted}>No activity logged for this day.</Text>}
     </Card>
     <Card style={{ backgroundColor: 'rgba(45,104,106,0.28)', borderColor: 'rgba(118,240,219,0.3)' }}><Text style={{ color: theme.accent, fontSize: 11, letterSpacing: 1, fontWeight: '800' }}>DAY SUMMARY</Text>
