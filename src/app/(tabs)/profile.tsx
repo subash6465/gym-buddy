@@ -19,6 +19,9 @@ export default function ProfileScreen() {
   const [reviewing, setReviewing] = useState(false);
   const [draft, setDraft] = useState<Profile>(profile);
   const [draftWeight, setDraftWeight] = useState('');
+  const normalizedDraft = { ...draft, name: draft.name.trim(), heightCm: draft.heightCm.trim(), allergies: draft.allergies.trim(), concerns: draft.concerns.trim(), fitnessPlan: profile.fitnessPlan, weightKg: Number(draftWeight) };
+  const effectiveWeight = store.weighIns[0]?.kg || profile.weightKg;
+  const hasProfileChanges = (Object.keys(profile) as (keyof Profile)[]).some((key) => key !== 'fitnessPlan' && key !== 'weightKg' && normalizedDraft[key] !== profile[key]) || normalizedDraft.weightKg !== effectiveWeight;
   const [profileBusy, setProfileBusy] = useState(false);
   const [profileError, setProfileError] = useState('');
   const [deletingAccount, setDeletingAccount] = useState(false);
@@ -72,8 +75,9 @@ export default function ProfileScreen() {
   };
   const saveAndRecompute = async () => {
     if (profileBusy) return;
+    if (!hasProfileChanges) { setEditing(false); setReviewing(false); return; }
     setProfileBusy(true); setProfileError('');
-    const next = { ...draft, name: draft.name.trim(), heightCm: draft.heightCm.trim(), allergies: draft.allergies.trim(), concerns: draft.concerns.trim(), fitnessPlan: draft.fitnessPlan.trim(), weightKg: Number(draftWeight) };
+    const next = normalizedDraft;
     try {
       await auth.recomputeProfile(next);
       store.replaceProfile(next);
@@ -88,8 +92,8 @@ export default function ProfileScreen() {
   const targets = planTargets(profile, latest?.kg, auth.plan, now);
   const height = Number(profile.heightCm);
   const bmi = latest && height > 0 ? latest.kg / ((height / 100) ** 2) : null;
-  const changedFields = (Object.keys(profile) as (keyof Profile)[]).filter((key) => key !== 'weightKg' && key !== 'fitnessPlan' && draft[key] !== profile[key]);
-  if (draftWeight && Number(draftWeight) !== (latest?.kg || profile.weightKg)) changedFields.push('weightKg');
+  const changedFields = (Object.keys(profile) as (keyof Profile)[]).filter((key) => key !== 'weightKg' && key !== 'fitnessPlan' && normalizedDraft[key] !== profile[key]);
+  if (normalizedDraft.weightKg !== (latest?.kg || profile.weightKg)) changedFields.push('weightKg');
   return <Page>
     <Title eyebrow="YOUR JOURNEY" subtitle={`Signed in as ${auth.user.email}. Your profile is saved to your account.`}>Made for your goals.</Title>
     {!editing ? <Card><Text style={{ color: theme.text, fontSize: 20, fontWeight: '800' }}>Your profile and direction</Text>
@@ -117,7 +121,7 @@ export default function ProfileScreen() {
       <Label>ALLERGIES OR FOODS TO AVOID</Label><Input value={draft.allergies} onChangeText={(value) => setDraftField('allergies', value)} multiline />
       <Label>INJURIES, PAIN OR OTHER CONCERNS</Label><Input value={draft.concerns} onChangeText={(value) => setDraftField('concerns', value)} multiline />
       {profileError ? <Text accessibilityRole="alert" style={{ color: theme.red }}>{profileError}</Text> : null}
-      {!reviewing ? <Button onPress={reviewChanges}>Review changes</Button> : <><Text style={{ color: theme.text, fontWeight: '800' }}>Changes to save: {changedFields.length ? changedFields.join(', ') : 'No fields changed'}</Text><Text style={ui.muted}>Saving will update your profile and recompute all plan targets with AI. Previous logs and reviews stay in their original periods.</Text><Button disabled={profileBusy || !changedFields.length} onPress={() => { void saveAndRecompute(); }}>{profileBusy ? 'Recomputing plan…' : 'Save and recompute with AI'}</Button></>}
+      {!reviewing ? hasProfileChanges ? <Button onPress={reviewChanges}>Review changes</Button> : <Button secondary onPress={() => setEditing(false)}>Done · no changes</Button> : <><Text style={{ color: theme.text, fontWeight: '800' }}>Changes to save: {changedFields.length ? changedFields.join(', ') : 'No fields changed'}</Text><Text style={ui.muted}>Saving will update your profile and recompute all plan targets with AI. Previous logs and reviews stay in their original periods.</Text><Button disabled={profileBusy || !changedFields.length} onPress={() => { void saveAndRecompute(); }}>{profileBusy ? 'Recomputing plan…' : 'Save and recompute with AI'}</Button></>}
       <Button secondary disabled={profileBusy} onPress={() => { setEditing(false); setReviewing(false); }}>Cancel without saving</Button>
     </Card>}
     <Card style={{ backgroundColor: 'rgba(45,104,106,0.28)', borderColor: 'rgba(118,240,219,0.3)' }}><Text style={{ color: theme.accent, fontWeight: '800' }}>SUGGESTED DAILY TARGETS</Text>

@@ -75,3 +75,20 @@ test('Gemini plan generation falls back to JSON mode when its strict schema is r
     assert.match(requests[1].systemInstruction.parts[0].text, /recommendedDays/);
   } finally { globalThis.fetch = original; }
 });
+
+test('chat revision uses the approved plan instead of the original submitted schedule', async () => {
+  const original = globalThis.fetch;
+  let request;
+  globalThis.fetch = async (_url, options) => {
+    request = JSON.parse(options.body);
+    return { ok: true, json: async () => ({ output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(raw) }] }] }) };
+  };
+  try {
+    const previousPlan = normalizePlan(raw, profile);
+    await createPlan({ ...profile, fitnessPlan: 'An obsolete schedule' }, { provider: 'openai', apiKey: 'private-test-key' },
+      [{ role: 'user', content: 'Move training to Tuesday' }], previousPlan);
+    const sent = JSON.parse(request.input.at(-1).content);
+    assert.equal(sent.profile.suppliedWorkoutPlan, '');
+    assert.equal(sent.previousPlan.summary, previousPlan.summary);
+  } finally { globalThis.fetch = original; }
+});

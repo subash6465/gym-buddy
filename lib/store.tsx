@@ -36,6 +36,9 @@ type Store = Data & {
   setLegacyWater: (date: string, ml: number) => void;
   addSteps: (date: string, count: number) => void;
   editSteps: (entry: StepEntry) => void;
+  setDayWater: (date: string, ml: number) => void;
+  setDaySteps: (date: string, count: number) => void;
+  setDayWeight: (date: string, kg: number) => void;
   clearAccountData: () => Promise<void>;
   removeMeal: (id: string) => void;
   removeWorkout: (id: string) => void;
@@ -109,6 +112,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setLegacyWater: (date, ml) => setData((old) => ({ ...old, water: { ...old.water,
       [date]: old.waterEntries.filter((item) => item.date === date).reduce((sum, item) => sum + item.ml, 0) + ml } })),
     editSteps: (entry) => setData((old) => ({ ...old, stepEntries: old.stepEntries.map((item) => item.id === entry.id ? entry : item) })),
+    setDayWater: (date, ml) => setData((old) => ({ ...old, water: { ...old.water, [date]: ml },
+      waterEntries: [{ id: newId(), date, time: clockTime(), ml }, ...old.waterEntries.filter((item) => item.date !== date)] })),
+    setDaySteps: (date, count) => setData((old) => ({ ...old,
+      stepEntries: [{ id: newId(), date, time: clockTime(), count }, ...old.stepEntries.filter((item) => item.date !== date)] })),
+    setDayWeight: (date, kg) => setData((old) => ({ ...old,
+      weighIns: [{ id: newId(), date, kg }, ...old.weighIns.filter((item) => item.date !== date)].sort((a, b) => b.date.localeCompare(a.date)) })),
     clearAccountData: async () => {
       deleting.current = true;
       await writes.current.catch(() => {});

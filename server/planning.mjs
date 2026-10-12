@@ -74,7 +74,7 @@ export async function createPlan(profile, config, conversation = [], previousPla
     heightCm: Number(profile.heightCm), weightKg: profile.weightKg, goal: profile.goal, setting: profile.setting,
     activity: profile.activity, daysPerWeek: profile.daysPerWeek, pace: profile.pace, equation: profile.equation,
     nutritionCaution: profile.nutritionCaution, allergies: profile.allergies, concerns: profile.concerns,
-    suppliedWorkoutPlan: profile.fitnessPlan,
+    suppliedWorkoutPlan: previousPlan ? '' : profile.fitnessPlan,
   }, estimatedMaintenanceCalories: guide?.maintenance || 0, estimatedRestingCalories: guide?.resting || 0,
   previousPlan: previousPlan ? { summary: previousPlan.summary, days: previousPlan.days } : null,
   conversation: conversation.slice(-12) };
