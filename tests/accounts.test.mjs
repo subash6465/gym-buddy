@@ -15,6 +15,8 @@ test('account setup persists profile and sessions are isolated', () => {
     goal: 'maintain', setting: 'home', activity: 'light', equation: '', nutritionCaution: false,
     allergies: 'peanuts', concerns: 'knee pain', fitnessPlan: 'Walk three days' };
   assert.throws(() => saveProfile(`Bearer ${first.token}`, { ...profile, dob: '1995-02-30' }), { status: 400 });
+  assert.throws(() => saveProfile(`Bearer ${first.token}`, { ...profile, heightCm: 'invalid' }), { status: 400 });
+  assert.throws(() => login('first@example.com', 'x'.repeat(129)), { status: 401 });
   saveProfile(`Bearer ${first.token}`, profile);
   assert.deepEqual(getAccount(`Bearer ${first.token}`).profile, profile);
   assert.equal(getAccount(`Bearer ${second.token}`).profile, null);

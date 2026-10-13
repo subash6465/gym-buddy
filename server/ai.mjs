@@ -74,7 +74,7 @@ export async function generate({ provider, apiKey, instructions, messages, image
   } else if (provider === 'claude') {
     url = 'https://api.anthropic.com/v1/messages';
     headers = { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' };
-    body = { model: models.claude(), max_tokens: 1200, system: instructions,
+    body = { model: models.claude(), max_tokens: jsonSchema ? 6000 : 1200, system: instructions,
       messages: messages.map((message, index) => ({ role: message.role, content: index === last && photo
         ? [{ type: 'text', text: message.content }, { type: 'image', source: { type: 'base64', media_type: photo.mimeType, data: photo.data } }]
         : message.content })), ...(jsonSchema ? { output_config: { format: { type: 'json_schema', schema: jsonSchema } } } : {}) };
@@ -99,7 +99,9 @@ export async function generate({ provider, apiKey, instructions, messages, image
       generationConfig: { ...(body.generationConfig?.thinkingConfig ? { thinkingConfig: body.generationConfig.thinkingConfig } : {}), responseMimeType: 'application/json' } };
     response = await sendProviderRequest(provider, url, headers, fallbackBody, deadline);
   }
-  const payload = await response.json();
+  let payload;
+  try { payload = await response.json(); }
+  catch { throw Object.assign(new Error(`${provider} returned an invalid response. Try again.`), { status: 502 }); }
   const text = provider === 'openai'
     ? payload.output?.flatMap((item) => item.type === 'message' ? item.content || [] : []).filter((item) => item.type === 'output_text').map((item) => item.text).join('\n')
     : provider === 'claude' ? payload.content?.filter((item) => item.type === 'text').map((item) => item.text).join('\n')

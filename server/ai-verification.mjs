@@ -1,4 +1,5 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { Buffer } from 'node:buffer';
 import { generate } from './ai.mjs';
 
 const ticketSecret = randomBytes(32);

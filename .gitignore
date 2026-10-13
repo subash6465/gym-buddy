@@ -44,6 +44,10 @@ yarn-debug.*
 yarn-error.*
 pnpm-debug.*
 *.log
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.sqlite.ai-key
 
 # OS files
 .DS_Store

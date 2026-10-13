@@ -14,7 +14,7 @@ export function ageOnDate(dob: string, now = new Date()): number | null {
 export function suggestedTargets(profile: Profile, weightKg?: number, now = new Date()) {
   const age = ageOnDate(profile.dob, now);
   const height = Number(profile.heightCm);
-  if (age === null || age < 20 || !weightKg || weightKg <= 0 || !Number.isFinite(height) || height < 100 || height > 250 || !profile.equation || nutritionRestrictions(profile).requiresClinician) return null;
+  if (age === null || age < 20 || !weightKg || !Number.isFinite(weightKg) || weightKg < 25 || weightKg > 400 || !Number.isFinite(height) || height < 100 || height > 250 || !profile.equation || nutritionRestrictions(profile).requiresClinician) return null;
   const bmi = weightKg / ((height / 100) ** 2);
   if (profile.goal === 'lose' && bmi < 18.5) return null;
   const resting = 10 * weightKg + 6.25 * height - 5 * age + (profile.equation === 'male' ? 5 : -161);
