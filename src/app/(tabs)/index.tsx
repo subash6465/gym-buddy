@@ -1,3 +1,6 @@
+import MacroBreakdown from '@/components/MacroBreakdown';
+import { macroTotals } from '@/lib/macros';
+import { formatDate } from '@/lib/dates';
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -38,12 +41,12 @@ export default function Today() {
   const todayPlan = auth.plan?.days[(now.getDay() + 6) % 7];
   const firstName = store.profile.name.trim().split(' ')[0];
   const recent = [
-    ...meals.map((item) => ({ id: item.id, time: item.time, title: item.name, detail: `${Math.round(item.calories)} kcal · ${Math.round(item.protein)} g protein`, icon: 'meal' as const, color: theme.nutrition })),
+    ...meals.map((item) => ({ id: item.id, time: item.time, title: item.name, detail: `${Math.round(item.calories)} kcal`, icon: 'meal' as const, color: theme.nutrition })),
     ...workouts.map((item) => ({ id: item.id, time: item.time, title: item.name, detail: `${item.minutes} min training`, icon: 'workout' as const, color: theme.accent })),
   ].sort((a, b) => (b.time || '').localeCompare(a.time || '')).slice(0, 3);
 
   return <Page>
-    <Title eyebrow={now.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })} subtitle="Small steps. Stronger every day.">{firstName ? `Let's move, ${firstName}.` : 'Make today count.'}</Title>
+    <Title eyebrow={`${now.toLocaleDateString(undefined, { weekday: 'long' })} / ${formatDate(now)}`} subtitle="Small steps. Stronger every day.">{firstName ? `Let's move, ${firstName}.` : 'Make today count.'}</Title>
     <Card style={{ backgroundColor: theme.hero, borderColor: theme.heroLine, padding: 22 }}>
       <LinearGradient pointerEvents="none" colors={[theme.heroGlow, 'transparent']} start={{ x: 1, y: 0 }} end={{ x: 0, y: 1 }} style={StyleSheet.absoluteFill} />
       <Row><Text style={[ui.eyebrow, { flex: 1 }]}>TODAY’S FOCUS</Text><View style={s.pill}><Text style={s.pillText}>{todayPlan?.isRest ? 'RECOVERY' : 'TRAINING'}</Text></View></Row>
@@ -68,7 +71,7 @@ export default function Today() {
     <MotionPressable onPress={() => router.push('/chat')} style={{ width: '100%' }}><Card style={{ width: '100%' }}><Row><View style={s.coachIcon}><Icon name="sparkles" color={theme.secondary} size={23} /></View><View style={{ flex: 1, gap: 4 }}><Text style={{ color: theme.text, fontSize: 17, fontFamily: theme.font }}>A little guidance goes far.</Text><Text style={ui.muted}>Talk meals, training & goals with your AI coach.</Text></View><Icon name="arrow" color={theme.muted} size={17} /></Row></Card></MotionPressable>
     <Row><Text style={s.section}>Today’s activity</Text><Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/(tabs)/history', params: { view: 'history' } })} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: theme.accent, fontSize: 12, fontWeight: '700' }}>See history ↗</Text></Pressable></Row>
     <Card>{recent.length ? recent.map((item) => <Row key={item.id}><View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: `${item.color}16`, alignItems: 'center', justifyContent: 'center' }}><Icon name={item.icon} color={item.color} size={18} /></View><View style={{ flex: 1, gap: 3 }}><Text style={{ color: theme.text, fontSize: 14, fontWeight: '700' }}>{item.title}</Text><Text style={[ui.muted, { fontSize: 11 }]}>{item.detail}</Text></View></Row>) : <><Text style={{ color: theme.text, fontSize: 15, fontWeight: '700' }}>A fresh page for today.</Text><Text style={ui.muted}>Your meals and workouts will show up here as you log them. Start with a quick check-in above.</Text></>}</Card>
-    {meals.length > 0 && <Card><Text style={s.section}>Macro breakdown</Text>{([['Carbs', 'carbs', theme.hydration], ['Fat', 'fat', theme.secondary], ['Fibre', 'fibre', theme.accent], ['Sugar', 'sugar', theme.nutrition]] as const).map(([label, key, color]) => <Row key={key}><View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: color }} /><Text style={[ui.muted, { flex: 1 }]}>{label}</Text><Text style={{ color: theme.text, fontWeight: '700' }}>{Math.round(sum(meals, key))} g</Text></Row>)}</Card>}
+    <Card><Text style={s.section}>Macro breakdown</Text><MacroBreakdown amounts={macroTotals(meals)} targets={targets} /></Card>
   </Page>;
 }
 const s = StyleSheet.create({

@@ -50,3 +50,5 @@ The shared app targets both Android and iOS. Once signed in to an Expo account, 
 ## UI redesign
 
 The Kinetic design uses Gold / Night surfaces, gold actions, neutral metric colors, a bundled Space Grotesk heading font, and restrained glass gradients. See [design notes](docs/ui-redesign.md) for the screen map, research, analytics semantics, and validation status.
+
+All displayed dates use `dd-mm-yyyy`; saved dates stay ISO. Shared Gold / Night calendar and time dialogs work across platforms. Macro panels compare intake with daily guides and general adult reference ranges; total sugar shows no guide rather than a fabricated recommendation.

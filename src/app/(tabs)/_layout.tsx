@@ -1,6 +1,6 @@
 import { router, Tabs } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Animated, ColorValue, Keyboard, Pressable, Text, View } from 'react-native';
+import { Animated, ColorValue, Easing, Keyboard, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/UI';
 import { theme } from '@/lib/theme';
@@ -28,10 +28,11 @@ export default function TabLayout() {
     const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardOpen(false));
     return () => { show.remove(); hide.remove(); };
   }, []);
-  return <View style={{ flex: 1 }}><Tabs screenOptions={{
+  return <View style={{ flex: 1, backgroundColor: theme.bg }}><Tabs screenOptions={{
     headerShown: false,
-    animation: reduced === false ? 'shift' : 'none',
-    transitionSpec: { animation: 'timing', config: { duration: 230 } },
+    sceneStyle: { backgroundColor: theme.bg },
+    animation: reduced === false ? 'fade' : 'none',
+    transitionSpec: { animation: 'timing', config: { duration: 280, easing: Easing.out(Easing.cubic) } },
     tabBarHideOnKeyboard: true,
     tabBarActiveTintColor: theme.accent,
     tabBarInactiveTintColor: theme.muted,

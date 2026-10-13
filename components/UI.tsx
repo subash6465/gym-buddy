@@ -1,4 +1,4 @@
-import { Children, createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import { Children, createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { useIsFocused } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import {
@@ -30,6 +30,9 @@ const symbolNames = {
   progress: { ios: 'chart.xyaxis.line', android: 'monitoring', web: 'monitoring' },
   steps: { ios: 'figure.walk', android: 'directions_walk', web: 'directions_walk' },
   weight: { ios: 'scalemass', android: 'monitor_weight', web: 'monitor_weight' },
+  previous: { ios: 'chevron.left', android: 'chevron_left', web: 'chevron_left' },
+  next: { ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' },
+  down: { ios: 'chevron.down', android: 'expand_more', web: 'expand_more' },
 } as const;
 
 const PageFocusContext = createContext(true);
@@ -55,7 +58,7 @@ export function Page({ children }: { children: ReactNode }) {
         <ScrollView style={s.page} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={false}>
           <Reveal delay={0}><Brand /></Reveal>
           {Children.toArray(children).map((child, index) =>
-            <Reveal key={index} delay={Math.min(index * 45, 270)}>{child}</Reveal>)}
+            <Reveal key={index} delay={Math.min(index * 24, 120)}>{child}</Reveal>)}
         </ScrollView>
       </PageFocusContext.Provider>
     </KeyboardAvoidingView>
@@ -65,13 +68,15 @@ export function Page({ children }: { children: ReactNode }) {
 export function Reveal({ children, delay = 0, style }: { children: ReactNode; delay?: number; style?: StyleProp<ViewStyle> }) {
   const reduced = useReduceMotion();
   const focused = useContext(PageFocusContext);
-  const [progress] = useState(() => new Animated.Value(0));
+  const [progress] = useState(() => new Animated.Value(1));
+  const revealed = useRef(false);
   useEffect(() => {
     if (reduced === null || !focused) return;
-    if (reduced) { progress.setValue(1); return; }
-    progress.setValue(0);
+    if (reduced || revealed.current) { progress.setValue(1); return; }
+    revealed.current = true;
+    progress.setValue(.88);
     const animation = Animated.timing(progress, {
-      toValue: 1, delay, duration: 360, easing: Easing.out(Easing.cubic), useNativeDriver: true,
+      toValue: 1, delay, duration: 240, easing: Easing.out(Easing.cubic), useNativeDriver: true,
     });
     animation.start();
     return () => animation.stop();

@@ -6,7 +6,7 @@ import MealTimePicker from '@/components/MealTimePicker';
 import { Button, Card, Input, Label, Page, Title, ui } from '@/components/UI';
 import { Meal, StepEntry, WaterEntry, WeighIn, useStore } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
-import { localDay, parseDay } from '@/lib/dates';
+import { localDay, parseDay, formatDate } from '@/lib/dates';
 import { theme } from '@/lib/theme';
 
 type Kind = 'meal' | 'workout' | 'weight' | 'water' | 'steps' | 'legacy-water';
@@ -39,7 +39,7 @@ export default function EditEntry() {
       const meal = entry as Meal;
       const description = (changes.note ?? mealDescription).trim();
       if (draft.type !== 'snack' && store.meals.some((meal) => meal.id !== entry.id && meal.date === draft.date && meal.type === draft.type)) {
-        return setError(`A ${draft.type} entry already exists on ${draft.date}. Edit that entry first or choose another meal type.`);
+        return setError(`A ${draft.type} entry already exists on ${formatDate(draft.date)}. Edit that entry first or choose another meal type.`);
       }
       const noteChanged = comparableText(description) !== comparableText(mealDescription);
       const time = draft.time || '12:00';

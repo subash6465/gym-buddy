@@ -6,7 +6,7 @@ import { BrandMark } from '@/components/BrandMark';
 import { Icon } from '@/components/UI';
 import { ChatAction, useAuth } from '@/lib/auth';
 import { today, useStore } from '@/lib/store';
-import { parseDay } from '@/lib/dates';
+import { parseDay, formatDate, displayDatesInText } from '@/lib/dates';
 import { planTargets } from '@/lib/targets';
 import type { AiPlan } from '@/lib/plan';
 import { theme } from '@/lib/theme';
@@ -102,9 +102,9 @@ export default function Chat() {
           <Text style={{ color: theme.muted, fontSize: 11, lineHeight: 18 }}>Review and approve suggested log or plan changes before they are saved.</Text>
         </View> : null}
         {messages.map((message, index) => <View key={index} style={{ alignSelf: message.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '88%', backgroundColor: message.role === 'user' ? theme.accent : theme.card, borderRadius: 20, padding: 17, gap: 12, borderWidth: 1, borderColor: message.role === 'user' ? theme.accent : theme.line }}>
-          <Text style={{ color: message.role === 'user' ? theme.ink : theme.text, fontSize: 14, lineHeight: 21 }}>{message.content}</Text>
+          <Text style={{ color: message.role === 'user' ? theme.ink : theme.text, fontSize: 14, lineHeight: 21 }}>{displayDatesInText(message.content)}</Text>
           {message.proposal ? <View style={{ backgroundColor: theme.cardAlt, borderRadius: 12, padding: 12, gap: 8, borderWidth: 1, borderColor: theme.line }}>
-            <Text style={{ color: theme.accent, fontFamily: theme.font }}>Approve change · {message.proposal.action.date}</Text>
+            <Text style={{ color: theme.accent, fontFamily: theme.font }}>Approve change · {formatDate(message.proposal.action.date)}</Text>
             <Text style={{ color: theme.text }}>{message.proposal.action.kind === 'water' ? 'Daily water total' : message.proposal.action.kind === 'steps' ? 'Daily steps total' : 'Weight'}: {message.proposal.oldValue || 'No entry'} → {message.proposal.newValue} {message.proposal.action.kind === 'water' ? 'ml' : message.proposal.action.kind === 'weight' ? 'kg' : 'steps'}</Text>
             <Text style={{ color: theme.muted, fontSize: 12 }}>{message.proposal.action.mode === 'add' ? `Approval adds a new ${message.proposal.action.value} ${message.proposal.action.kind === 'water' ? 'ml water' : 'step'} entry.` : 'Approval replaces the saved entries for this date with this value.'}</Text>
             {message.proposal.status === 'pending' ? <View style={{ flexDirection: 'row', gap: 8 }}>

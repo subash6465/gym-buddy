@@ -3,7 +3,7 @@ import { Text, View } from 'react-native';
 import { Card, Icon, Row, ui, MotionPressable } from './UI';
 import ProgressChart from './ProgressChart';
 import { rangeTotals, type Logs } from '@/lib/analytics';
-import { shiftDay } from '@/lib/dates';
+import { formatDate, shiftDay } from '@/lib/dates';
 import { theme } from '@/lib/theme';
 
 export default function ProgressHub({ logs, today }: { logs: Logs; today: string }) {
@@ -20,7 +20,7 @@ export default function ProgressHub({ logs, today }: { logs: Logs; today: string
       <View style={{ flexDirection: 'row', gap: 8 }}>{days.map((day) => {
         const logged = Boolean(day.meals || day.workouts || day.water || day.steps || logs.weighIns.some((entry) => entry.date === day.date));
         return <View key={day.date} style={{ flex: 1, alignItems: 'center', gap: 9 }}>
-          <View accessibilityLabel={`${day.date}: ${logged ? 'activity logged' : 'no activity logged'}`} style={{ width: '100%', height: 8, borderRadius: 4, backgroundColor: logged ? theme.accent : theme.line }} />
+          <View accessibilityLabel={`${formatDate(day.date)}: ${logged ? 'activity logged' : 'no activity logged'}`} style={{ width: '100%', height: 8, borderRadius: 4, backgroundColor: logged ? theme.accent : theme.line }} />
           <Text style={{ color: day.date === today ? theme.accent : theme.muted, fontSize: 11 }}>{new Date(`${day.date}T12:00:00`).toLocaleDateString(undefined, { weekday: 'narrow' })}</Text>
         </View>;
       })}</View>

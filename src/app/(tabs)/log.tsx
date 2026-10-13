@@ -1,3 +1,5 @@
+import MacroBreakdown from '@/components/MacroBreakdown';
+import { planTargets } from '@/lib/targets';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
@@ -9,7 +11,7 @@ import type { MealEstimate } from '@/lib/mealEstimate';
 import { useAuth } from '@/lib/auth';
 import { Meal, today, useStore } from '@/lib/store';
 import { theme } from '@/lib/theme';
-import { parseDay } from '@/lib/dates';
+import { parseDay, formatDate } from '@/lib/dates';
 
 type Mode = 'meal' | 'workout' | 'weight' | 'water' | 'steps';
 const clockTime = () => { const date = new Date(); return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`; };
@@ -41,6 +43,7 @@ export default function Log() {
   const setSuccess = (text: string) => setNotice({ context: entryContext, text });
   const [name, setName] = useState(''); const [note, setNote] = useState('');
   const [minutes, setMinutes] = useState(''); const [weight, setWeight] = useState(''); const [water, setWater] = useState(''); const [steps, setSteps] = useState('');
+  const nutritionTargets = planTargets(store.profile, store.weighIns.find((entry) => entry.date <= date)?.kg, auth.plan, new Date(`${date}T12:00:00`));
   const existing = mealType !== 'snack' ? store.meals.find((meal) => meal.date === date && meal.type === mealType) : null;
 
   async function pickPhoto(camera: boolean) {
@@ -66,24 +69,24 @@ export default function Log() {
     if (!estimate) return;
     store.addMeal({ date, time: mealTime, type: mealType, name: estimate.name, note: `${description.trim()}${estimate.assumptions ? ` · Assumptions: ${estimate.assumptions}` : ''}`, calories: estimate.calories, protein: estimate.protein, carbs: estimate.carbs, fat: estimate.fat, fibre: estimate.fibre, sugar: estimate.sugar });
     setDescription(''); setPhoto(null); setPhotoData(null); setEstimate(null); setMealTime(clockTime()); setError('');
-    setSuccess(`Meal saved · ${date} at ${mealTime}`);
+    setSuccess(`Meal saved · ${formatDate(date)} at ${mealTime}`);
   }
   function saveOther() {
     setSuccess(''); setError('');
     if (mode === 'weight') {
       const kg = Number(weight);
       if (!Number.isFinite(kg) || kg <= 0 || kg > 500) return setError('Enter a valid weight in kilograms (up to 500 kg).');
-      store.addWeighIn(date, kg); setWeight(''); setSuccess(`Weigh-in saved · ${date}`); return;
+      store.addWeighIn(date, kg); setWeight(''); setSuccess(`Weigh-in saved · ${formatDate(date)}`); return;
     }
     if (mode === 'water') {
       const ml = Number(water);
       if (!Number.isFinite(ml) || ml <= 0 || ml > 5000) return setError('Enter a positive water amount, up to 5,000 ml.');
-      store.addWater(date, ml); setWater(''); setSuccess(`Water saved · ${date}`); return;
+      store.addWater(date, ml); setWater(''); setSuccess(`Water saved · ${formatDate(date)}`); return;
     }
     if (mode === 'steps') {
       const count = Number(steps);
       if (!Number.isInteger(count) || count <= 0 || count > 100000) return setError('Enter a whole number of steps from 1 to 100,000.');
-      store.addSteps(date, count); setSteps(''); setSuccess(`Steps saved · ${date}`); return;
+      store.addSteps(date, count); setSteps(''); setSuccess(`Steps saved · ${formatDate(date)}`); return;
     }
     const duration = Number(minutes);
     if (!name.trim() || !Number.isFinite(duration) || duration <= 0 || duration > 1440) return setError('Enter an activity and a positive duration, up to 1,440 minutes.');
@@ -103,7 +106,7 @@ export default function Log() {
     </View>
     {success ? <Card><Row><Icon name="check" color={theme.accent} /><Text accessibilityRole="alert" style={{ color: theme.accent, flex: 1, fontWeight: '700' }}>{success}</Text></Row></Card> : null}
     {mode !== 'meal' && error ? <Card><Text accessibilityRole="alert" style={{ color: theme.red }}>{error}</Text></Card> : null}
-    <Disclosure title={date === today() ? 'Logging for today' : `Logging for ${date}`} subtitle="Tap to change date or fill a past gap"><DaySelector value={date} onChange={setDate} /><Text style={ui.muted}>Edit existing entries in Progress / Daily history.</Text></Disclosure>
+    <Disclosure title={date === today() ? 'Logging for today' : `Logging for ${formatDate(date)}`} subtitle="Tap to change date or fill a past gap"><DaySelector value={date} onChange={setDate} /><Text style={ui.muted}>Edit existing entries in Progress / Daily history.</Text></Disclosure>
     {mode === 'meal' ? <Reveal key="meal" style={{ gap: 18 }}>
       <Card>
         <Text style={{ color: theme.text, fontSize: 19, fontFamily: theme.font }}>What did you eat?</Text>
@@ -115,7 +118,7 @@ export default function Log() {
               <Text style={{ color: mealType === type ? theme.accent : theme.text, fontFamily: theme.font, fontSize: 11, textTransform: 'capitalize' }}>{type}</Text>
             </MotionPressable>)}
         </View>
-        {existing && <Text style={{ color: theme.nutrition, fontSize: 12 }}>Saving another {mealType} for {date} will replace the current entry. Snacks can be added more than once.</Text>}
+        {existing && <Text style={{ color: theme.nutrition, fontSize: 12 }}>Saving another {mealType} for {formatDate(date)} will replace the current entry. Snacks can be added more than once.</Text>}
         <Label>TIME</Label><MealTimePicker value={mealTime} onChange={setMealTime} />
         <Label>FOOD AND PORTION</Label>
         <Input value={description} onChangeText={(value) => { setDescription(value); setEstimate(null); }} multiline placeholder="e.g. 2 chapatis (80 g), dal (150 g), paneer (100 g), oil (1 tsp)" style={{ minHeight: 94, textAlignVertical: 'top' }} />
@@ -130,8 +133,7 @@ export default function Log() {
         <Row><Icon name="sparkles" color={theme.accent} size={19} /><Text style={{ color: theme.accent, fontFamily: theme.font, fontSize: 10, letterSpacing: 1 }}>AI ESTIMATE · REVIEW BEFORE SAVING</Text></Row>
         <Text style={{ color: theme.text, fontSize: 20, fontFamily: theme.font }}>{estimate.name}</Text>
         <Text style={{ color: theme.text, fontSize: 27, fontFamily: theme.font }}>~{Math.round(estimate.calories)} kcal</Text>
-        <Text style={{ color: theme.text }}>Protein {Math.round(estimate.protein)} g · Carbs {Math.round(estimate.carbs)} g · Fat {Math.round(estimate.fat)} g</Text>
-        <Text style={ui.muted}>Fibre {Math.round(estimate.fibre)} g · Sugar {Math.round(estimate.sugar)} g</Text>
+        <MacroBreakdown amounts={estimate} targets={nutritionTargets} label="Estimated meal / daily guide" />
         <Text style={ui.muted}>Assumptions: {estimate.assumptions}</Text>
         <Text style={[ui.muted, { fontSize: 11 }]}>Check the estimate. Add missing ingredients or portions and estimate again. Do not use a photo estimate to verify allergens.</Text>
         <Button onPress={saveMeal}>{existing ? `Replace ${mealType}` : 'Save meal'}</Button>

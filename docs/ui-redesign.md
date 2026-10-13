@@ -43,8 +43,18 @@ Implementation references: [Expo SDK 57](https://docs.expo.dev/versions/v57.0.0/
 
 ## Verification
 
-Lint and TypeScript pass. All 36 automated tests pass. Expo exports JavaScript/Hermes bundles for web, iOS, and Android; this checks bundling, not signed installable builds. The raster app icon was visually inspected.
+Lint and TypeScript pass. All 42 automated tests pass. Expo exports JavaScript/Hermes bundles for web, iOS, and Android; this checks bundling, not signed installable builds. The raster app icon was visually inspected.
 
 The browser tool reported no available browsers, so screen-level visual QA and device interaction testing could not be performed in this session. Before V1 release, verify small-phone layouts, large accessibility text, keyboard behavior, Android/iOS date pickers, chart selection, and all logging/approval flows on actual devices. These checks remain outstanding.
 
 Run `npm run api` and `npm start` for a device preview, or `npm run web` for the browser preview. The new drawing and gradient packages were installed with Expo's SDK-compatible installer.
+
+## Macro guides, dates, and motion
+
+Nutrition panels share one consumed / daily-guide component, including Today, selected-day summaries, meal estimates, Plan, and Profile. The history timeline compares each meal with the daily guide and labels that context explicitly. Protein keeps the approved plan guide. Carbohydrate ranges use 45-60% of daily energy at 4 kcal/g; fat ranges use 20-35% at 9 kcal/g; the adult fibre reference is 25 g/day. These are general adult references, not newly personalized AI targets. All guides remain paused for profiles whose existing nutrition-target rules pause estimates.
+
+The references come from [EFSA's dietary reference values](https://www.efsa.europa.eu/en/press/news/nda100326), supported by its [summary report](https://www.efsa.europa.eu/sites/default/files/2017_09_DRVs_summary_report.pdf). The app logs total sugar, which includes naturally occurring sugars. It displays a missing guide rather than treating a free/added-sugar limit as a total-sugar target; see [EFSA's sugar assessment](https://www.efsa.europa.eu/en/plain-language-summary/tolerable-upper-intake-level-dietary-sugars).
+
+All structured dates display as DD-MM-YYYY, including picker fields, chart labels, history, profile birth dates, notices, review periods, and coach change proposals. Dates embedded in coach/review text are also formatted for display. Storage, IDs, date comparisons, and API parameters remain ISO. Calendar and time dialogs share the Gold / Night surface across Android, iOS, and web, with direct date entry, bounded calendar navigation, 24-hour time controls, cancel/apply actions, and Android-back dismissal. Native OS picker dialogs are no longer used.
+
+Navigation receives an explicit dark theme at the root and dark tab-scene backgrounds. Tab changes crossfade over 280 ms; stack navigation uses a fade with a short upward movement. Content begins visible and never resets to invisible on tab revisits. Reduced-motion preferences disable transitions. Runtime smoothness and keyboard/accessibility behavior still require device confirmation because the available browser inventory is empty.
