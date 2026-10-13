@@ -10,9 +10,9 @@ import { theme } from '@/lib/theme';
 type Metric = ProgressMetric;
 const metrics: { key: Metric; label: string; unit: string; color: string }[] = [
   { key: 'workoutMinutes', label: 'Training', unit: 'min', color: theme.accent },
-  { key: 'steps', label: 'Steps', unit: 'steps', color: theme.purple },
-  { key: 'water', label: 'Water', unit: 'ml', color: theme.blue },
-  { key: 'calories', label: 'Energy', unit: 'kcal', color: theme.orange },
+  { key: 'steps', label: 'Steps', unit: 'steps', color: theme.secondary },
+  { key: 'water', label: 'Water', unit: 'ml', color: theme.hydration },
+  { key: 'calories', label: 'Energy', unit: 'kcal', color: theme.nutrition },
   { key: 'weight', label: 'Weight', unit: 'kg', color: theme.accent },
 ];
 

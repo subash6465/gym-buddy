@@ -111,11 +111,11 @@ export default function Log() {
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
           {(['breakfast', 'lunch', 'dinner', 'snack'] as const).map((type) =>
             <MotionPressable key={type} onPress={() => { setMealType(type); setEstimate(null); }} accessibilityState={{ selected: mealType === type }}
-              style={{ paddingHorizontal: 12, paddingVertical: 9, borderRadius: 11, backgroundColor: mealType === type ? 'rgba(212,248,120,0.17)' : theme.cardAlt, borderWidth: 1, borderColor: mealType === type ? 'rgba(212,248,120,0.55)' : theme.line }}>
+              style={{ paddingHorizontal: 12, paddingVertical: 9, borderRadius: 11, backgroundColor: mealType === type ? 'rgba(252,163,17,0.17)' : theme.cardAlt, borderWidth: 1, borderColor: mealType === type ? 'rgba(252,163,17,0.55)' : theme.line }}>
               <Text style={{ color: mealType === type ? theme.accent : theme.text, fontFamily: theme.font, fontSize: 11, textTransform: 'capitalize' }}>{type}</Text>
             </MotionPressable>)}
         </View>
-        {existing && <Text style={{ color: theme.orange, fontSize: 12 }}>Saving another {mealType} for {date} will replace the current entry. Snacks can be added more than once.</Text>}
+        {existing && <Text style={{ color: theme.nutrition, fontSize: 12 }}>Saving another {mealType} for {date} will replace the current entry. Snacks can be added more than once.</Text>}
         <Label>TIME</Label><MealTimePicker value={mealTime} onChange={setMealTime} />
         <Label>FOOD AND PORTION</Label>
         <Input value={description} onChangeText={(value) => { setDescription(value); setEstimate(null); }} multiline placeholder="e.g. 2 chapatis (80 g), dal (150 g), paneer (100 g), oil (1 tsp)" style={{ minHeight: 94, textAlignVertical: 'top' }} />
@@ -126,7 +126,7 @@ export default function Log() {
       </Card>
       <Button onPress={analyze} disabled={estimating}>{estimating ? 'Estimating…' : estimate ? 'Estimate again' : 'Estimate nutrition with AI'}</Button>
       {error ? <Reveal><Card><Text style={{ color: theme.red }}>{error}</Text></Card></Reveal> : null}
-      {estimate && <Reveal><Card style={{ backgroundColor: theme.hero, borderColor: 'rgba(212,248,120,0.3)' }}>
+      {estimate && <Reveal><Card style={{ backgroundColor: theme.hero, borderColor: 'rgba(252,163,17,0.3)' }}>
         <Row><Icon name="sparkles" color={theme.accent} size={19} /><Text style={{ color: theme.accent, fontFamily: theme.font, fontSize: 10, letterSpacing: 1 }}>AI ESTIMATE · REVIEW BEFORE SAVING</Text></Row>
         <Text style={{ color: theme.text, fontSize: 20, fontFamily: theme.font }}>{estimate.name}</Text>
         <Text style={{ color: theme.text, fontSize: 27, fontFamily: theme.font }}>~{Math.round(estimate.calories)} kcal</Text>

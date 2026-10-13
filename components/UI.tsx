@@ -49,7 +49,7 @@ export function Brand() {
 export function Page({ children }: { children: ReactNode }) {
   const focused = useIsFocused();
   return <SafeAreaView style={s.safe} edges={['top']}>
-    <LinearGradient pointerEvents="none" colors={['rgba(212,248,120,0.055)', 'transparent', 'rgba(128,201,245,0.025)']} style={StyleSheet.absoluteFill} />
+    <LinearGradient pointerEvents="none" colors={[theme.glow, 'transparent', theme.nightGlow]} style={StyleSheet.absoluteFill} />
     <KeyboardAvoidingView style={s.page} behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}>
       <PageFocusContext.Provider value={focused}>
         <ScrollView style={s.page} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={false}>
@@ -149,7 +149,7 @@ export function Row({ children }: { children: ReactNode }) { return <View style=
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.bg },
   page: { flex: 1 },
-  content: { width: '100%', maxWidth: 680, alignSelf: 'center', paddingHorizontal: 22, paddingTop: 18, paddingBottom: 140, gap: 22 },
+  content: { width: '100%', maxWidth: 680, alignSelf: 'center', paddingHorizontal: 22, paddingTop: 18, paddingBottom: 210, gap: 22 },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 6 },
   brandName: { color: theme.text, fontSize: 20, fontFamily: theme.font, letterSpacing: -1 },
   brandTag: { color: theme.muted, fontSize: 8, fontWeight: '700', letterSpacing: 1.4 },

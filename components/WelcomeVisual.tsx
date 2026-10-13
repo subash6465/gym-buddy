@@ -11,12 +11,12 @@ export function WelcomeVisual() {
       <Circle cx={170} cy={100} r={42} fill={theme.accentSoft} />
       <Path d="M80 100A90 90 0 0 1 228 31" stroke={theme.accent} strokeWidth={2} strokeLinecap="round" fill="none" />
       <Circle cx={228} cy={31} r={4} fill={theme.accent} />
-      <Circle cx={109} cy={166} r={4} fill={theme.blue} />
+      <Circle cx={109} cy={166} r={4} fill={theme.hydration} />
       <Line x1={10} x2={85} y1={100} y2={100} stroke={theme.line} />
       <Line x1={255} x2={330} y1={100} y2={100} stroke={theme.line} />
     </Svg>
     <BrandMark size={57} />
-    <View style={{ position: 'absolute', left: 0, top: 35, borderRadius: 12, padding: 11, backgroundColor: '#1B2022', borderWidth: 1, borderColor: theme.line }}><Text style={{ color: theme.accent, fontSize: 9, fontFamily: theme.font, letterSpacing: 1 }}>TRAIN WITH PURPOSE</Text><Text style={{ color: theme.text, fontSize: 13, fontWeight: '700', marginTop: 4 }}>Your plan. Your pace.</Text></View>
-    <View style={{ position: 'absolute', right: 0, bottom: 26, borderRadius: 12, padding: 11, backgroundColor: '#1B2022', borderWidth: 1, borderColor: theme.line }}><Text style={{ color: theme.blue, fontSize: 9, fontFamily: theme.font, letterSpacing: 1 }}>SEE YOUR PROGRESS</Text><Text style={{ color: theme.text, fontSize: 13, fontWeight: '700', marginTop: 4 }}>Every check-in counts.</Text></View>
+    <View style={{ position: 'absolute', left: 0, top: 35, borderRadius: 12, padding: 11, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.line }}><Text style={{ color: theme.accent, fontSize: 9, fontFamily: theme.font, letterSpacing: 1 }}>TRAIN WITH PURPOSE</Text><Text style={{ color: theme.text, fontSize: 13, fontWeight: '700', marginTop: 4 }}>Your plan. Your pace.</Text></View>
+    <View style={{ position: 'absolute', right: 0, bottom: 26, borderRadius: 12, padding: 11, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.line }}><Text style={{ color: theme.hydration, fontSize: 9, fontFamily: theme.font, letterSpacing: 1 }}>SEE YOUR PROGRESS</Text><Text style={{ color: theme.text, fontSize: 13, fontWeight: '700', marginTop: 4 }}>Every check-in counts.</Text></View>
   </View>;
 }

@@ -4,8 +4,8 @@ The redesign makes the next useful action easy to find and gives progress its ow
 
 ## Visual system
 
-- Graphite `#0B0D10` canvas, off-white text, electric lime `#D4F878` primary actions.
-- Blue for hydration, peach for nutrition, violet for steps and coaching, lime for training.
+- Gold / Night palette from the supplied references: gold `#FCA311`, night navy `#14213D`, near-black `#05070C`, charcoal surfaces, white text and neutral supporting colors.
+- Gold for primary actions, training and steps; pale gold for nutrition; white and gray for supporting metrics. Warm gold and navy gradients preserve the existing glass treatment.
 - Bundled, licensed Space Grotesk Bold for headings and prominent numbers; platform-native body text.
 - Glass is expressed through translucent surfaces, fine borders, and subtle gradients. Broad background blur is deliberately avoided to keep charts readable and scrolling inexpensive across platforms.
 - The same forward-motion brand mark appears in the app, app icon, splash image, Android adaptive icon, monochrome icon, and favicon. `assets/images/brand-mark.svg` is the scalable source.
@@ -15,13 +15,15 @@ The redesign makes the next useful action easy to find and gives progress its ow
 
 | Destination | Primary purpose |
 | --- | --- |
-| Today | Today's session, quick logs, energy guide, four daily metrics, coaching, recent activity |
+| Today | Today's session, five quick logs (meal, workout, water, weight, steps), energy guide, four daily metrics, coaching, recent activity |
 | Plan | Training direction, seven-day selector, expandable sessions, guides, plan context |
 | Log | Five explicit log types, optional date adjustment, entry form, inline validation and save feedback |
 | Progress | Seven-day consistency, training totals, weight change, selectable 7D/30D charts, AI reviews |
 | Progress / Daily history | Date selection, daily summary, chronological entries, editing |
 | Profile | Identity and direction, expandable personal details, guides, AI configuration, account actions |
 | Coach | Suggested starting prompts, conversation, existing explicit approvals for changes |
+
+A persistent gold **AI Coach** button sits above the bottom navigation on every main tab, hides while the native keyboard is open, and opens the existing coach conversation. Content has bottom spacing so its final controls can scroll clear of the button.
 
 Quick-log links carry a fresh entry context. Reopening a shortcut uses its requested log type and date rather than retaining a previous manual selection. Existing drafts are preserved.
 
