@@ -1,3 +1,4 @@
+import { WelcomeVisual } from '@/components/WelcomeVisual';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Keyboard, Platform, Pressable, Text, View } from 'react-native';
 import { Button, Card, Input, Label, Page, Title, ui } from '@/components/UI';
@@ -47,25 +48,24 @@ export default function Welcome() {
     finally { setBusy(false); }
   };
   return <Page>
-      <Title eyebrow="YOUR STRONGER START" subtitle="A simple place to plan, move, and keep track of what matters to you.">Make progress feel personal.</Title>
-      <View style={{ flexDirection: 'row', gap: 10 }}>
-        {['Build your plan', 'Track each day', 'Find your rhythm'].map((item, index) => <View key={item} style={{ flex: 1, minHeight: 75, borderRadius: 16, padding: 11, backgroundColor: index === 0 ? 'rgba(118,240,219,.16)' : theme.cardAlt, borderWidth: 1, borderColor: theme.line }}><Text style={{ color: theme.accent, fontSize: 11, fontWeight: '800' }}>0{index + 1}</Text><Text style={{ color: theme.text, fontSize: 12, fontWeight: '700', marginTop: 7 }}>{item}</Text></View>)}
-      </View>
+      <Title eyebrow="MEET YOUR DAILY EDGE" subtitle="Train with intent. Fuel your goals. See how far you go.">Stronger starts here.</Title>
+      {step === 'account' ? <WelcomeVisual /> : null}
       <Card>
-        <Text style={{ color: theme.text, fontSize: 22, fontWeight: '800' }}>{step === 'ai' ? 'Choose your AI provider' : create ? 'Create your account' : 'Welcome back'}</Text>
+        <Text style={ui.eyebrow}>{step === 'account' ? '01 / ACCOUNT' : '02 / YOUR AI COACH'}</Text>
+        <Text style={{ color: theme.text, fontSize: 24, fontFamily: theme.font, letterSpacing: -.5 }}>{step === 'ai' ? 'Choose your AI provider' : create ? 'Create your account' : 'Welcome back'}</Text>
         <Text style={ui.muted}>{step === 'ai' ? 'Your key is saved to your account and used for meal estimates and chat.' : create ? 'Tell us a little about yourself next. Your plan starts there.' : 'Sign in to continue your journey.'}</Text>
         {step === 'account' ? <>
           <Label>EMAIL</Label><Input value={email} onChangeText={setEmail} placeholder="you@example.com" autoCapitalize="none" autoCorrect={false} keyboardType="email-address" autoComplete="email" textContentType="emailAddress" />
           <Label>PASSWORD</Label><Input value={password} onChangeText={setPassword} placeholder={create ? 'At least 10 characters' : 'Your password'} secureTextEntry autoCapitalize="none" autoComplete={create ? 'new-password' : 'current-password'} textContentType={create ? 'newPassword' : 'password'} onSubmitEditing={submit} />
         </> : <>
           <Label>AI PROVIDER</Label>
-          <View style={{ flexDirection: 'row', gap: 8 }}>{([['openai', 'OpenAI'], ['claude', 'Claude'], ['gemini', 'Gemini']] as const).map(([value, label]) => <Pressable key={value} disabled={verifying} onPress={() => { setProvider(value); setApiKey(''); setTicket(''); setVerifiedKey(''); }} accessibilityRole="button" accessibilityState={{ selected: provider === value }} style={{ flex: 1, minHeight: 46, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: provider === value ? theme.accent : theme.cardAlt }}><Text style={{ color: provider === value ? theme.ink : theme.text, fontWeight: '800' }}>{label}</Text></Pressable>)}</View>
+          <View style={{ flexDirection: 'row', gap: 8 }}>{([['openai', 'OpenAI'], ['claude', 'Claude'], ['gemini', 'Gemini']] as const).map(([value, label]) => <Pressable key={value} disabled={verifying} onPress={() => { setProvider(value); setApiKey(''); setTicket(''); setVerifiedKey(''); }} accessibilityRole="button" accessibilityState={{ selected: provider === value }} style={{ flex: 1, minHeight: 46, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: provider === value ? theme.accent : theme.cardAlt }}><Text style={{ color: provider === value ? theme.ink : theme.text, fontFamily: theme.font }}>{label}</Text></Pressable>)}</View>
           <Label>{provider.toUpperCase()} API KEY</Label><Input value={apiKey} editable={!verifying} onChangeText={(value) => { setApiKey(value); setTicket(''); setVerifiedKey(''); }} placeholder="Paste your API key" secureTextEntry autoCapitalize="none" autoCorrect={false} onSubmitEditing={() => { void verify(); }} />
-          <Pressable onPress={() => { void verify(); }} disabled={verifying || busy} accessibilityRole="button" style={{ minHeight: 48, borderRadius: 13, backgroundColor: theme.cardAlt, justifyContent: 'center', alignItems: 'center' }}><View style={{ flexDirection: 'row', gap: 9, alignItems: 'center' }}>{verifying ? <ActivityIndicator color={theme.accent} /> : null}<Text style={{ color: theme.accent, fontWeight: '800' }}>{verifying ? 'Verifying your API key…' : ticket ? 'Verified successfully ✓' : 'Verify API key'}</Text></View></Pressable>
+          <Pressable onPress={() => { void verify(); }} disabled={verifying || busy} accessibilityRole="button" style={{ minHeight: 48, borderRadius: 13, backgroundColor: theme.cardAlt, justifyContent: 'center', alignItems: 'center' }}><View style={{ flexDirection: 'row', gap: 9, alignItems: 'center' }}>{verifying ? <ActivityIndicator color={theme.accent} /> : null}<Text style={{ color: theme.accent, fontFamily: theme.font }}>{verifying ? 'Verifying your API key…' : ticket ? 'Verified successfully ✓' : 'Verify API key'}</Text></View></Pressable>
           <Text style={[ui.muted, { fontSize: 11 }]}>The key is sent to your Gym Buddy API server, encrypted there, and never shown again. Use a trusted connection.</Text>
         </>}
         {error ? <Text accessibilityRole="alert" style={{ color: theme.red, fontSize: 13 }}>{error}</Text> : null}
-        <Pressable onPress={() => { void submit(); }} disabled={busy || verifying || (step === 'ai' && !ticket)} accessibilityRole="button" accessibilityState={{ disabled: busy || verifying || (step === 'ai' && !ticket), busy }} style={{ minHeight: 50, borderRadius: 13, backgroundColor: theme.accent, alignItems: 'center', justifyContent: 'center', opacity: busy || verifying || (step === 'ai' && !ticket) ? .55 : 1 }}><Text style={{ color: theme.ink, fontSize: 14, fontWeight: '800' }}>{busy ? 'Connecting…' : step === 'account' ? 'Continue to AI setup' : create ? 'Create account' : 'Sign in'}</Text></Pressable>
+        <Pressable onPress={() => { void submit(); }} disabled={busy || verifying || (step === 'ai' && !ticket)} accessibilityRole="button" accessibilityState={{ disabled: busy || verifying || (step === 'ai' && !ticket), busy }} style={{ minHeight: 50, borderRadius: 13, backgroundColor: theme.accent, alignItems: 'center', justifyContent: 'center', opacity: busy || verifying || (step === 'ai' && !ticket) ? .55 : 1 }}><Text style={{ color: theme.ink, fontSize: 14, fontFamily: theme.font }}>{busy ? 'Connecting…' : step === 'account' ? 'Continue to AI setup' : create ? 'Create account' : 'Sign in'}</Text></Pressable>
         <Button secondary onPress={() => { if (step === 'ai') { setStep('account'); setApiKey(''); } else setCreate(!create); setError(''); }}>{step === 'ai' ? 'Back to account details' : create ? 'Already have an account? Sign in' : 'New here? Create an account'}</Button>
       </Card>
       <Text style={[ui.muted, { textAlign: 'center' }]}>Your health details are saved to your account after setup. Use a trusted connection when signing in.</Text>

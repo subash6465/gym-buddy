@@ -10,6 +10,7 @@ export default function Root({ children }: { children: ReactNode }) {
     <html lang="en">
       <head>
         <meta charSet="utf-8" />
+        <meta name="theme-color" content="#0B0D10" />
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
 
@@ -29,11 +30,6 @@ export default function Root({ children }: { children: ReactNode }) {
 }
 
 const responsiveBackground = `
-body {
-  background-color: #fff;
-}
-@media (prefers-color-scheme: dark) {
-  body {
-    background-color: #000;
-  }
-}`;
+body { background-color: #0B0D10; color-scheme: dark; }
+:focus-visible { outline: 2px solid #D4F878; outline-offset: 3px; }
+`;

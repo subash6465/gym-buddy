@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { BrandMark } from '@/components/BrandMark';
 import { Icon } from '@/components/UI';
 import { ChatAction, useAuth } from '@/lib/auth';
 import { today, useStore } from '@/lib/store';
@@ -88,24 +89,31 @@ export default function Chat() {
   return <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }} edges={['top', 'bottom']}>
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}>
       <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderColor: theme.line, gap: 12 }}>
-        <Pressable onPress={() => router.replace('/(tabs)')} accessibilityRole="button" accessibilityLabel="Close chat" style={{ padding: 8 }}><Text style={{ color: theme.accent, fontSize: 16, fontWeight: '800' }}>‹ Back</Text></Pressable>
-        <Icon name="chat" color={theme.accent} size={22} /><Text style={{ color: theme.text, fontSize: 20, fontWeight: '800' }}>Gym Buddy AI</Text>
+        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)')} accessibilityRole="button" accessibilityLabel="Close chat" style={{ padding: 8 }}><Text style={{ color: theme.accent, fontSize: 16, fontFamily: theme.font }}>‹ Back</Text></Pressable>
+        <Icon name="chat" color={theme.accent} size={22} /><Text style={{ color: theme.text, fontSize: 20, fontFamily: theme.font }}>Your AI coach</Text>
       </View>
-      <ScrollView ref={scroll} contentContainerStyle={{ padding: 18, gap: 12, flexGrow: 1 }} onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: true })} keyboardShouldPersistTaps="handled">
-        {messages.length === 0 ? <View style={{ marginTop: 20, gap: 8 }}><Text style={{ color: theme.text, fontSize: 24, fontWeight: '800' }}>What can I help with?</Text><Text style={{ color: theme.muted, lineHeight: 21 }}>Ask about your meals, training, or daily progress. I can use today’s logged details to give more relevant suggestions.</Text></View> : null}
-        {messages.map((message, index) => <View key={index} style={{ alignSelf: message.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '88%', backgroundColor: message.role === 'user' ? theme.accent : theme.card, borderRadius: 18, padding: 14, gap: 10 }}>
+      <ScrollView ref={scroll} contentContainerStyle={{ padding: 18, gap: 12, flexGrow: 1 }} onContentSizeChange={() => messages.length > 0 && scroll.current?.scrollToEnd({ animated: false })} keyboardShouldPersistTaps="handled">
+        {messages.length === 0 ? <View style={{ marginTop: 24, gap: 18, maxWidth: 580, width: '100%', alignSelf: 'center' }}>
+          <View style={{ width: 64, height: 64, borderRadius: 22, backgroundColor: theme.accentSoft, justifyContent: 'center', alignItems: 'center' }}><BrandMark size={40} /></View>
+          <Text style={{ color: theme.accent, fontSize: 10, fontFamily: theme.font, letterSpacing: 1.8 }}>A PARTNER IN YOUR PROGRESS</Text>
+          <Text style={{ color: theme.text, fontSize: 34, lineHeight: 40, letterSpacing: -1.2, fontFamily: theme.font }}>Let’s find your next step.</Text>
+          <Text style={{ color: theme.muted, lineHeight: 22, fontSize: 14 }}>Talk through meals, training, or your daily progress. Your coach can use today’s logs to make suggestions more relevant.</Text>
+          {['How am I doing today?', 'Help me plan a protein-rich meal.', 'How can I adapt this week’s training?'].map((prompt) => <Pressable key={prompt} accessibilityRole="button" onPress={() => setDraft(prompt)} style={{ borderWidth: 1, borderColor: theme.line, backgroundColor: theme.card, borderRadius: 18, minHeight: 58, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }}><Text style={{ color: theme.text, fontSize: 14, flex: 1 }}>{prompt}</Text><Icon name="arrow" color={theme.accent} size={17} /></Pressable>)}
+          <Text style={{ color: theme.muted, fontSize: 11, lineHeight: 18 }}>Review and approve suggested log or plan changes before they are saved.</Text>
+        </View> : null}
+        {messages.map((message, index) => <View key={index} style={{ alignSelf: message.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '88%', backgroundColor: message.role === 'user' ? theme.accent : theme.card, borderRadius: 20, padding: 17, gap: 12, borderWidth: 1, borderColor: message.role === 'user' ? theme.accent : theme.line }}>
           <Text style={{ color: message.role === 'user' ? theme.ink : theme.text, fontSize: 14, lineHeight: 21 }}>{message.content}</Text>
           {message.proposal ? <View style={{ backgroundColor: theme.cardAlt, borderRadius: 12, padding: 12, gap: 8, borderWidth: 1, borderColor: theme.line }}>
-            <Text style={{ color: theme.accent, fontWeight: '800' }}>Approve change · {message.proposal.action.date}</Text>
+            <Text style={{ color: theme.accent, fontFamily: theme.font }}>Approve change · {message.proposal.action.date}</Text>
             <Text style={{ color: theme.text }}>{message.proposal.action.kind === 'water' ? 'Daily water total' : message.proposal.action.kind === 'steps' ? 'Daily steps total' : 'Weight'}: {message.proposal.oldValue || 'No entry'} → {message.proposal.newValue} {message.proposal.action.kind === 'water' ? 'ml' : message.proposal.action.kind === 'weight' ? 'kg' : 'steps'}</Text>
             <Text style={{ color: theme.muted, fontSize: 12 }}>{message.proposal.action.mode === 'add' ? `Approval adds a new ${message.proposal.action.value} ${message.proposal.action.kind === 'water' ? 'ml water' : 'step'} entry.` : 'Approval replaces the saved entries for this date with this value.'}</Text>
             {message.proposal.status === 'pending' ? <View style={{ flexDirection: 'row', gap: 8 }}>
-              <Pressable accessibilityRole="button" disabled={busy} onPress={() => decide(index, true)} style={{ backgroundColor: theme.accent, padding: 10, borderRadius: 10, opacity: busy ? .5 : 1 }}><Text style={{ color: theme.ink, fontWeight: '800' }}>Approve</Text></Pressable>
-              <Pressable accessibilityRole="button" disabled={busy} onPress={() => decide(index, false)} style={{ backgroundColor: theme.card, padding: 10, borderRadius: 10, opacity: busy ? .5 : 1 }}><Text style={{ color: theme.text, fontWeight: '800' }}>Reject</Text></Pressable>
+              <Pressable accessibilityRole="button" disabled={busy} onPress={() => decide(index, true)} style={{ backgroundColor: theme.accent, padding: 10, borderRadius: 10, opacity: busy ? .5 : 1 }}><Text style={{ color: theme.ink, fontFamily: theme.font }}>Approve</Text></Pressable>
+              <Pressable accessibilityRole="button" disabled={busy} onPress={() => decide(index, false)} style={{ backgroundColor: theme.card, padding: 10, borderRadius: 10, opacity: busy ? .5 : 1 }}><Text style={{ color: theme.text, fontFamily: theme.font }}>Reject</Text></Pressable>
             </View> : <Text style={{ color: message.proposal.status === 'approved' ? theme.accent : theme.muted }}>{message.proposal.status === 'approved' ? 'Approved and saved' : message.proposal.status === 'stale' ? 'Saved value changed. Ask again to review a fresh proposal.' : 'Rejected. No change saved.'}</Text>}
           </View> : null}
           {message.planProposal ? <View style={{ backgroundColor: theme.cardAlt, borderRadius: 12, padding: 12, gap: 8, borderWidth: 1, borderColor: theme.line }}>
-            <Text style={{ color: theme.accent, fontWeight: '800' }}>Weekly plan revision</Text>
+            <Text style={{ color: theme.accent, fontFamily: theme.font }}>Weekly plan revision</Text>
             <Text style={{ color: theme.text, fontWeight: '700' }}>Current week</Text>
             <Text style={{ color: theme.muted }}>{message.planProposal.prior?.summary || 'No saved plan'}</Text>
             {message.planProposal.prior ? <Text style={{ color: theme.muted, fontSize: 12 }}>{message.planProposal.prior.days.map((day) => `${day.day.slice(0, 3)}: ${day.title}`).join(' · ')}</Text> : null}
@@ -114,8 +122,8 @@ export default function Chat() {
             <Text style={{ color: theme.muted, fontSize: 12 }}>Daily goals: {message.planProposal.prior?.calorieTarget || 0} → {message.planProposal.plan.calorieTarget} kcal · {message.planProposal.prior?.proteinGrams || 0} → {message.planProposal.plan.proteinGrams} g protein · {message.planProposal.prior?.stepsTarget || 0} → {message.planProposal.plan.stepsTarget} steps</Text>
             {message.planProposal.plan.days.map((day) => <View key={day.day} style={{ borderTopWidth: 1, borderColor: theme.line, paddingTop: 6 }}><Text style={{ color: theme.text, fontWeight: '700' }}>{day.day}: {day.title}</Text><Text style={{ color: theme.muted, fontSize: 12 }}>{day.focus} · {day.activities.join(', ')}</Text></View>)}
             {message.planProposal.status === 'pending' ? <View style={{ flexDirection: 'row', gap: 8 }}>
-              <Pressable accessibilityRole="button" disabled={busy || revising} onPress={() => { void decidePlan(index, true); }} style={{ backgroundColor: theme.accent, padding: 10, borderRadius: 10, opacity: busy || revising ? .5 : 1 }}><Text style={{ color: theme.ink, fontWeight: '800' }}>{revising ? 'Saving…' : 'Approve'}</Text></Pressable>
-              <Pressable accessibilityRole="button" disabled={busy || revising} onPress={() => { void decidePlan(index, false); }} style={{ backgroundColor: theme.card, padding: 10, borderRadius: 10, opacity: busy || revising ? .5 : 1 }}><Text style={{ color: theme.text, fontWeight: '800' }}>Reject</Text></Pressable>
+              <Pressable accessibilityRole="button" disabled={busy || revising} onPress={() => { void decidePlan(index, true); }} style={{ backgroundColor: theme.accent, padding: 10, borderRadius: 10, opacity: busy || revising ? .5 : 1 }}><Text style={{ color: theme.ink, fontFamily: theme.font }}>{revising ? 'Saving…' : 'Approve'}</Text></Pressable>
+              <Pressable accessibilityRole="button" disabled={busy || revising} onPress={() => { void decidePlan(index, false); }} style={{ backgroundColor: theme.card, padding: 10, borderRadius: 10, opacity: busy || revising ? .5 : 1 }}><Text style={{ color: theme.text, fontFamily: theme.font }}>Reject</Text></Pressable>
             </View> : <Text style={{ color: message.planProposal.status === 'approved' ? theme.accent : theme.muted }}>{message.planProposal.status === 'approved' ? 'Approved and saved' : 'Rejected. Plan unchanged.'}</Text>}
           </View> : null}
         </View>)}
@@ -124,7 +132,7 @@ export default function Chat() {
       </ScrollView>
       <View style={{ flexDirection: 'row', padding: 12, gap: 8, borderTopWidth: 1, borderColor: theme.line, alignItems: 'flex-end' }}>
         <TextInput value={draft} onChangeText={setDraft} placeholder="Ask anything about your progress…" placeholderTextColor={theme.muted} multiline maxLength={2000} style={{ flex: 1, maxHeight: 110, minHeight: 48, borderRadius: 15, backgroundColor: theme.cardAlt, color: theme.text, paddingHorizontal: 14, paddingVertical: 12 }} />
-        <Pressable onPress={() => { void send(); }} disabled={busy || revising || !draft.trim()} accessibilityRole="button" accessibilityLabel="Send message" style={{ backgroundColor: theme.accent, borderRadius: 14, minHeight: 48, paddingHorizontal: 16, justifyContent: 'center', opacity: busy || revising || !draft.trim() ? .5 : 1 }}><Text style={{ color: theme.ink, fontWeight: '800' }}>Send</Text></Pressable>
+        <Pressable onPress={() => { void send(); }} disabled={busy || revising || !draft.trim()} accessibilityRole="button" accessibilityLabel="Send message" style={{ backgroundColor: theme.accent, borderRadius: 14, minHeight: 48, paddingHorizontal: 16, justifyContent: 'center', opacity: busy || revising || !draft.trim() ? .5 : 1 }}><Text style={{ color: theme.ink, fontFamily: theme.font }}>Send</Text></Pressable>
       </View>
     </KeyboardAvoidingView>
   </SafeAreaView>;

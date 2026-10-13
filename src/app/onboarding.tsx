@@ -9,7 +9,7 @@ import { theme } from '@/lib/theme';
 
 function Choice<T extends string | number>({ options, value, onChange }: { options: readonly (readonly [T, string])[]; value: T; onChange: (value: T) => void }) {
   return <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{options.map(([key, label]) =>
-    <Pressable key={key} onPress={() => onChange(key)} accessibilityRole="button" accessibilityState={{ selected: value === key }} style={{ paddingHorizontal: 14, paddingVertical: 11, borderRadius: 12, backgroundColor: value === key ? theme.accent : theme.cardAlt, borderWidth: 1, borderColor: value === key ? theme.accent : theme.line }}><Text style={{ color: value === key ? theme.ink : theme.text, fontWeight: '800' }}>{label}</Text></Pressable>)}</View>;
+    <Pressable key={key} onPress={() => onChange(key)} accessibilityRole="button" accessibilityState={{ selected: value === key }} style={{ paddingHorizontal: 14, paddingVertical: 11, borderRadius: 12, backgroundColor: value === key ? theme.accent : theme.cardAlt, borderWidth: 1, borderColor: value === key ? theme.accent : theme.line }}><Text style={{ color: value === key ? theme.ink : theme.text, fontFamily: theme.font }}>{label}</Text></Pressable>)}</View>;
 }
 
 export default function Onboarding() {

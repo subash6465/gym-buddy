@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Platform, Pressable, Text, View } from 'react-native';
 import BirthDatePicker from '@/components/BirthDatePicker';
-import { Button, Card, Input, Label, MotionPressable, Page, Title, ui } from '@/components/UI';
+import { Button, Card, Disclosure, Input, Label, MotionPressable, Page, Row, Title, ui } from '@/components/UI';
 import { Goal, Profile, today, useStore } from '@/lib/store';
 import { ageOnDate, planTargets } from '@/lib/targets';
 import { useClock } from '@/lib/clock';
@@ -9,7 +9,7 @@ import { theme } from '@/lib/theme';
 import { AiProvider, useAuth } from '@/lib/auth';
 
 function Choice<T extends string | number>({ options, value, onChange }: { options: readonly (readonly [T, string])[]; value: T; onChange: (value: T) => void }) {
-  return <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{options.map(([option, label]) => <MotionPressable key={option} onPress={() => onChange(option)} accessibilityState={{ selected: value === option }} style={{ paddingHorizontal: 14, paddingVertical: 11, borderRadius: 12, backgroundColor: value === option ? theme.accent : theme.cardAlt }}><Text style={{ color: value === option ? theme.bg : theme.text, fontWeight: '800' }}>{label}</Text></MotionPressable>)}</View>;
+  return <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{options.map(([option, label]) => <MotionPressable key={option} onPress={() => onChange(option)} accessibilityState={{ selected: value === option }} style={{ paddingHorizontal: 14, paddingVertical: 11, borderRadius: 12, backgroundColor: value === option ? theme.accent : theme.cardAlt }}><Text style={{ color: value === option ? theme.bg : theme.text, fontFamily: theme.font }}>{label}</Text></MotionPressable>)}</View>;
 }
 export default function ProfileScreen() {
   const store = useStore();
@@ -95,8 +95,9 @@ export default function ProfileScreen() {
   const changedFields = (Object.keys(profile) as (keyof Profile)[]).filter((key) => key !== 'weightKg' && key !== 'fitnessPlan' && normalizedDraft[key] !== profile[key]);
   if (normalizedDraft.weightKg !== (latest?.kg || profile.weightKg)) changedFields.push('weightKg');
   return <Page>
-    <Title eyebrow="YOUR JOURNEY" subtitle={`Signed in as ${auth.user.email}. Your profile is saved to your account.`}>Made for your goals.</Title>
-    {!editing ? <Card><Text style={{ color: theme.text, fontSize: 20, fontWeight: '800' }}>Your profile and direction</Text>
+    <Title eyebrow="YOUR SPACE" subtitle="Your goals, preferences, and personal settings.">Profile</Title>
+    <Card style={{ backgroundColor: theme.hero, borderColor: theme.heroLine }}><Row><View style={{ width: 60, height: 60, borderRadius: 20, backgroundColor: theme.accentSoft, alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: theme.accent, fontSize: 25, fontFamily: theme.font }}>{profile.name.slice(0, 1).toUpperCase()}</Text></View><View style={{ flex: 1, gap: 4 }}><Text style={{ color: theme.text, fontSize: 24, fontFamily: theme.font }}>{profile.name}</Text><Text style={ui.muted}>{auth.user.email}</Text></View></Row><Row>{[[latest ? `${latest.kg} kg` : '—', 'WEIGHT'], [`${profile.daysPerWeek} days`, 'TRAINING / WEEK'], [profile.goal === 'lose' ? 'Lose' : profile.goal === 'gain' ? 'Gain' : 'Maintain', 'DIRECTION']].map(([value, label]) => <View key={label} style={{ flex: 1, gap: 5 }}><Text style={{ color: theme.text, fontSize: 17, fontFamily: theme.font }}>{value}</Text><Text style={{ color: theme.muted, fontSize: 8, letterSpacing: .5 }}>{label}</Text></View>)}</Row></Card>
+    {!editing ? <Disclosure title="Personal details & goals" subtitle="Measurements, training preferences & health context">
       {([
         ['Name', profile.name], ['Date of birth', profile.dob], ['Age today', age === null ? '—' : `${age} years`], ['Height', `${profile.heightCm} cm`],
         ['Latest weight', latest ? `${latest.kg} kg${bmi ? ` · BMI ${bmi.toFixed(1)}` : ''}` : 'No weigh-in'],
@@ -105,7 +106,7 @@ export default function ProfileScreen() {
         ['Allergies or foods to avoid', profile.allergies || 'Not entered'], ['Concerns', profile.concerns || 'Not entered'],
       ] as const).map(([label, value]) => <View key={label} style={{ borderTopWidth: 1, borderColor: theme.line, paddingTop: 9 }}><Label>{label.toUpperCase()}</Label><Text style={{ color: theme.text, marginTop: 3 }}>{value}</Text></View>)}
       <Button secondary onPress={startEdit}>Edit profile and goals</Button>
-    </Card> : <Card><Text style={{ color: theme.text, fontSize: 20, fontWeight: '800' }}>Edit all preferences</Text>
+    </Disclosure> : <Card><Text style={{ color: theme.text, fontSize: 20, fontFamily: theme.font }}>Edit all preferences</Text>
       <Text style={ui.muted}>Review every field before saving. The plan will be rebuilt from these details.</Text>
       <Label>NAME</Label><Input value={draft.name} onChangeText={(value) => setDraftField('name', value)} />
       <Label>DATE OF BIRTH</Label><BirthDatePicker value={draft.dob} onChange={(value) => setDraftField('dob', value)} />
@@ -121,25 +122,25 @@ export default function ProfileScreen() {
       <Label>ALLERGIES OR FOODS TO AVOID</Label><Input value={draft.allergies} onChangeText={(value) => setDraftField('allergies', value)} multiline />
       <Label>INJURIES, PAIN OR OTHER CONCERNS</Label><Input value={draft.concerns} onChangeText={(value) => setDraftField('concerns', value)} multiline />
       {profileError ? <Text accessibilityRole="alert" style={{ color: theme.red }}>{profileError}</Text> : null}
-      {!reviewing ? hasProfileChanges ? <Button onPress={reviewChanges}>Review changes</Button> : <Button secondary onPress={() => setEditing(false)}>Done · no changes</Button> : <><Text style={{ color: theme.text, fontWeight: '800' }}>Changes to save: {changedFields.length ? changedFields.join(', ') : 'No fields changed'}</Text><Text style={ui.muted}>Saving will update your profile and recompute all plan targets with AI. Previous logs and reviews stay in their original periods.</Text><Button disabled={profileBusy || !changedFields.length} onPress={() => { void saveAndRecompute(); }}>{profileBusy ? 'Recomputing plan…' : 'Save and recompute with AI'}</Button></>}
+      {!reviewing ? hasProfileChanges ? <Button onPress={reviewChanges}>Review changes</Button> : <Button secondary onPress={() => setEditing(false)}>Done · no changes</Button> : <><Text style={{ color: theme.text, fontFamily: theme.font }}>Changes to save: {changedFields.length ? changedFields.join(', ') : 'No fields changed'}</Text><Text style={ui.muted}>Saving will update your profile and recompute all plan targets with AI. Previous logs and reviews stay in their original periods.</Text><Button disabled={profileBusy || !changedFields.length} onPress={() => { void saveAndRecompute(); }}>{profileBusy ? 'Recomputing plan…' : 'Save and recompute with AI'}</Button></>}
       <Button secondary disabled={profileBusy} onPress={() => { setEditing(false); setReviewing(false); }}>Cancel without saving</Button>
     </Card>}
-    <Card style={{ backgroundColor: 'rgba(45,104,106,0.28)', borderColor: 'rgba(118,240,219,0.3)' }}><Text style={{ color: theme.accent, fontWeight: '800' }}>SUGGESTED DAILY TARGETS</Text>
-      {targets ? <><Text style={{ color: theme.text, fontSize: 27, fontWeight: '800' }}>{targets.calories} kcal</Text><Text style={{ color: theme.text, fontSize: 18, fontWeight: '700' }}>{targets.protein} g protein · {targets.water} ml drinks</Text><Text style={ui.muted}>Estimated maintenance: {targets.maintenance} kcal. Goal adjustment: {profile.goal === 'lose' ? 'about −300 kcal' : profile.goal === 'gain' ? 'about +200 kcal' : 'none'}. Protein guide: {targets.proteinFactor} g/kg.</Text><Text style={ui.muted}>Water is a starting drinks target; food also supplies water. Heat, exercise, illness and medical conditions can change your needs. These are estimates, not prescriptions.</Text></> : <Text style={ui.muted}>Enter a valid birth date (age 20+), height, current weight, and equation reference to see estimates. Automatic targets are paused when special dietary care is selected or when weight loss is selected at a low BMI.</Text>}
-    </Card>
-    <Card><Text style={{ color: theme.text, fontSize: 20, fontWeight: '800' }}>AI provider</Text>
+<Disclosure title="Your daily guides" subtitle={targets ? `${targets.calories.toLocaleString()} kcal / Nutrition & hydration estimates` : 'Personal estimates are paused'}>
+      {targets ? <><Text style={{ color: theme.text, fontSize: 27, fontFamily: theme.font }}>{targets.calories} kcal</Text><Text style={{ color: theme.text, fontSize: 18, fontWeight: '700' }}>{targets.protein} g protein · {targets.water} ml drinks</Text><Text style={ui.muted}>Estimated maintenance: {targets.maintenance} kcal. Goal adjustment: {profile.goal === 'lose' ? 'about −300 kcal' : profile.goal === 'gain' ? 'about +200 kcal' : 'none'}. Protein guide: {targets.proteinFactor} g/kg.</Text><Text style={ui.muted}>Water is a starting drinks target; food also supplies water. Heat, exercise, illness and medical conditions can change your needs. These are estimates, not prescriptions.</Text></> : <Text style={ui.muted}>Enter a valid birth date (age 20+), height, current weight, and equation reference to see estimates. Automatic targets are paused when special dietary care is selected or when weight loss is selected at a low BMI.</Text>}
+    </Disclosure>
+    <Disclosure title="AI coach settings" subtitle={`Connected to ${auth.ai.provider?.toUpperCase() || 'your provider'}`}>
       <Text style={ui.muted}>Current: {auth.ai.configured ? auth.ai.provider?.toUpperCase() : 'Not configured'}. A new key replaces the saved key for this account.</Text>
-      <View style={{ flexDirection: 'row', gap: 8 }}>{([['openai', 'OpenAI'], ['claude', 'Claude'], ['gemini', 'Gemini']] as const).map(([value, label]) => <Pressable key={value} disabled={aiVerifying} onPress={() => { setAiProvider(value); setAiKey(''); setAiTicket(''); }} accessibilityRole="button" accessibilityState={{ selected: aiProvider === value }} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 42, borderRadius: 12, backgroundColor: aiProvider === value ? theme.accent : theme.cardAlt }}><Text style={{ color: aiProvider === value ? theme.ink : theme.text, fontWeight: '800' }}>{label}</Text></Pressable>)}</View>
+      <View style={{ flexDirection: 'row', gap: 8 }}>{([['openai', 'OpenAI'], ['claude', 'Claude'], ['gemini', 'Gemini']] as const).map(([value, label]) => <Pressable key={value} disabled={aiVerifying} onPress={() => { setAiProvider(value); setAiKey(''); setAiTicket(''); }} accessibilityRole="button" accessibilityState={{ selected: aiProvider === value }} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 42, borderRadius: 12, backgroundColor: aiProvider === value ? theme.accent : theme.cardAlt }}><Text style={{ color: aiProvider === value ? theme.ink : theme.text, fontFamily: theme.font }}>{label}</Text></Pressable>)}</View>
       <Label>NEW API KEY</Label><Input value={aiKey} editable={!aiVerifying} onChangeText={(value) => { setAiKey(value); setAiTicket(''); }} secureTextEntry autoCapitalize="none" autoCorrect={false} placeholder="Paste a new API key" />
-      <Pressable onPress={() => { void verifyAi(); }} disabled={aiVerifying || aiBusy || aiKey.trim().length < 10} accessibilityRole="button" style={{ minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.cardAlt }}><View style={{ flexDirection: 'row', gap: 8 }}>{aiVerifying ? <ActivityIndicator color={theme.accent} /> : null}<Text style={{ color: theme.accent, fontWeight: '800' }}>{aiVerifying ? 'Verifying…' : aiTicket ? 'Verified ✓' : 'Verify API key'}</Text></View></Pressable>
+      <Pressable onPress={() => { void verifyAi(); }} disabled={aiVerifying || aiBusy || aiKey.trim().length < 10} accessibilityRole="button" style={{ minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.cardAlt }}><View style={{ flexDirection: 'row', gap: 8 }}>{aiVerifying ? <ActivityIndicator color={theme.accent} /> : null}<Text style={{ color: theme.accent, fontFamily: theme.font }}>{aiVerifying ? 'Verifying…' : aiTicket ? 'Verified ✓' : 'Verify API key'}</Text></View></Pressable>
       {aiMessage ? <Text accessibilityRole="alert" style={{ color: aiMessage === 'AI provider saved.' ? theme.accent : theme.red }}>{aiMessage}</Text> : null}
       <Button disabled={aiBusy || aiVerifying || !aiTicket} onPress={() => { void saveAi(); }}>{aiBusy ? 'Saving…' : 'Save AI provider'}</Button>
-    </Card>
+    </Disclosure>
     <Button secondary onPress={() => auth.signOut()}>Sign out</Button>
-    <Card><Text style={{ color: theme.text, fontSize: 18, fontWeight: '800' }}>Delete account</Text>
+    <Disclosure title="Delete account" subtitle="Permanently remove your account and data">
       <Text style={ui.muted}>Permanently removes your login, profile, and activity saved on this device.</Text>
       {deleteError ? <Text accessibilityRole="alert" style={{ color: theme.red }}>{deleteError}</Text> : null}
       <Button secondary disabled={deletingAccount} onPress={confirmDelete}>{deletingAccount ? 'Deleting account…' : 'Delete my account'}</Button>
-    </Card>
+    </Disclosure>
   </Page>;
 }

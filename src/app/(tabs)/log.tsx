@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Alert, Image, Text, View } from 'react-native';
 import DaySelector from '@/components/DaySelector';
 import MealTimePicker from '@/components/MealTimePicker';
-import { Button, Card, Icon, Input, Label, MotionPressable, Page, Reveal, Row, Title, ui } from '@/components/UI';
+import { Button, Card, Disclosure, Icon, Input, Label, MotionPressable, Page, Reveal, Row, Title, ui } from '@/components/UI';
 import type { MealEstimate } from '@/lib/mealEstimate';
 import { useAuth } from '@/lib/auth';
 import { Meal, today, useStore } from '@/lib/store';
@@ -17,12 +17,16 @@ const clockTime = () => { const date = new Date(); return `${String(date.getHour
 export default function Log() {
   const store = useStore();
   const auth = useAuth();
-  const params = useLocalSearchParams<{ date?: string }>();
+  const params = useLocalSearchParams<{ date?: string; mode?: string; entry?: string }>();
+  const entryContext = `${params.entry || ''}:${params.date || ''}:${params.mode || ''}`;
   const [dateOverride, setDateOverride] = useState<{ param?: string; date: string } | null>(null);
   const routedDate = typeof params.date === 'string' && parseDay(params.date) && params.date <= today() ? params.date : today();
-  const date = dateOverride && dateOverride.param === params.date ? dateOverride.date : routedDate;
-  const setDate = (next: string) => setDateOverride({ param: params.date, date: next });
-  const [mode, setMode] = useState<Mode>('meal');
+  const date = dateOverride && dateOverride.param === entryContext ? dateOverride.date : routedDate;
+  const setDate = (next: string) => { setDateOverride({ param: entryContext, date: next }); setSuccess(''); };
+  const routedMode: Mode = (['meal', 'workout', 'weight', 'water', 'steps'] as const).find((value) => value === params.mode) || 'meal';
+  const [modeOverride, setModeOverride] = useState<{ param?: string; mode: Mode } | null>(null);
+  const mode = modeOverride && modeOverride.param === entryContext ? modeOverride.mode : routedMode;
+  const setMode = (value: Mode) => { setModeOverride({ param: entryContext, mode: value }); setSuccess(''); setError(''); };
   const [photo, setPhoto] = useState<string | null>(null);
   const [photoData, setPhotoData] = useState<string | null>(null);
   const [description, setDescription] = useState('');
@@ -32,6 +36,9 @@ export default function Log() {
   const [estimate, setEstimate] = useState<MealEstimate | null>(null);
   const [estimating, setEstimating] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState<{ context: string; text: string } | null>(null);
+  const success = notice?.context === entryContext ? notice.text : '';
+  const setSuccess = (text: string) => setNotice({ context: entryContext, text });
   const [name, setName] = useState(''); const [note, setNote] = useState('');
   const [minutes, setMinutes] = useState(''); const [weight, setWeight] = useState(''); const [water, setWater] = useState(''); const [steps, setSteps] = useState('');
   const existing = mealType !== 'snack' ? store.meals.find((meal) => meal.date === date && meal.type === mealType) : null;
@@ -59,49 +66,53 @@ export default function Log() {
     if (!estimate) return;
     store.addMeal({ date, time: mealTime, type: mealType, name: estimate.name, note: `${description.trim()}${estimate.assumptions ? ` · Assumptions: ${estimate.assumptions}` : ''}`, calories: estimate.calories, protein: estimate.protein, carbs: estimate.carbs, fat: estimate.fat, fibre: estimate.fibre, sugar: estimate.sugar });
     setDescription(''); setPhoto(null); setPhotoData(null); setEstimate(null); setMealTime(clockTime()); setError('');
-    Alert.alert('Meal saved', `Logged for ${date} at ${mealTime}.`);
+    setSuccess(`Meal saved · ${date} at ${mealTime}`);
   }
   function saveOther() {
+    setSuccess(''); setError('');
     if (mode === 'weight') {
       const kg = Number(weight);
-      if (!Number.isFinite(kg) || kg <= 0 || kg > 500) return Alert.alert('Check weight', 'Enter a weight in kilograms.');
-      store.addWeighIn(date, kg); setWeight(''); Alert.alert('Saved', `Your weigh-in was logged for ${date}.`); return;
+      if (!Number.isFinite(kg) || kg <= 0 || kg > 500) return setError('Enter a valid weight in kilograms (up to 500 kg).');
+      store.addWeighIn(date, kg); setWeight(''); setSuccess(`Weigh-in saved · ${date}`); return;
     }
     if (mode === 'water') {
       const ml = Number(water);
-      if (!Number.isFinite(ml) || ml <= 0 || ml > 5000) return Alert.alert('Check water', 'Enter an amount in millilitres.');
-      store.addWater(date, ml); setWater(''); Alert.alert('Saved', `Your water was logged for ${date}.`); return;
+      if (!Number.isFinite(ml) || ml <= 0 || ml > 5000) return setError('Enter a positive water amount, up to 5,000 ml.');
+      store.addWater(date, ml); setWater(''); setSuccess(`Water saved · ${date}`); return;
     }
     if (mode === 'steps') {
       const count = Number(steps);
-      if (!Number.isInteger(count) || count <= 0 || count > 100000) return Alert.alert('Check steps', 'Enter a valid number of steps.');
-      store.addSteps(date, count); setSteps(''); Alert.alert('Saved', `Your steps were logged for ${date}.`); return;
+      if (!Number.isInteger(count) || count <= 0 || count > 100000) return setError('Enter a whole number of steps from 1 to 100,000.');
+      store.addSteps(date, count); setSteps(''); setSuccess(`Steps saved · ${date}`); return;
     }
     const duration = Number(minutes);
-    if (!name.trim() || !Number.isFinite(duration) || duration <= 0 || duration > 1440) return Alert.alert('Check workout', 'Enter an activity and its duration in minutes.');
+    if (!name.trim() || !Number.isFinite(duration) || duration <= 0 || duration > 1440) return setError('Enter an activity and a positive duration, up to 1,440 minutes.');
     store.addWorkout({ date, time: workoutTime, name: name.trim(), minutes: duration, note: note.trim() });
-    setName(''); setNote(''); setMinutes(''); setWorkoutTime(clockTime()); Alert.alert('Workout logged', 'Nice work showing up today.');
+    setName(''); setNote(''); setMinutes(''); setWorkoutTime(clockTime()); setSuccess('Workout saved. Nice work showing up today.');
   }
 
   return <Page>
-    <Title eyebrow="BUILD THE HABIT" subtitle="Capture the details that help you grow.">Log it. Keep moving.</Title>
-    <Card><Text style={{ color: theme.text, fontWeight: '800', fontSize: 16 }}>Log for a day</Text><DaySelector value={date} onChange={setDate} /><Text style={ui.muted}>Choose any past day to fill a gap. Existing entries can be corrected in History.</Text></Card>
+    <Title eyebrow="BUILD THE HABIT" subtitle="Capture the details that help you grow.">Check in. Move forward.</Title>
     <View style={{ flexDirection: 'row', gap: 5, padding: 5, borderRadius: 16, backgroundColor: theme.cardAlt, borderWidth: 1, borderColor: theme.line }}>
       {(['meal', 'workout', 'weight', 'water', 'steps'] as const).map((option) =>
         <MotionPressable key={option} onPress={() => setMode(option)} accessibilityState={{ selected: mode === option }}
-          style={{ flex: 1, minHeight: 40, borderRadius: 12, backgroundColor: mode === option ? theme.accent : 'transparent' }}>
-          <Text style={{ color: mode === option ? theme.ink : theme.muted, fontWeight: '800', fontSize: 11, textTransform: 'capitalize' }}>{option}</Text>
+          style={{ flex: 1, minHeight: 68, borderRadius: 12, backgroundColor: mode === option ? theme.accent : 'transparent' }}>
+          <Icon name={option === 'meal' ? 'meal' : option === 'workout' ? 'workout' : option === 'weight' ? 'weight' : option === 'water' ? 'water' : 'steps'} color={mode === option ? theme.ink : theme.muted} size={20} />
+          <Text style={{ marginTop: 7, color: mode === option ? theme.ink : theme.muted, fontFamily: theme.font, fontSize: 11, textTransform: 'capitalize' }}>{option}</Text>
         </MotionPressable>)}
     </View>
+    {success ? <Card><Row><Icon name="check" color={theme.accent} /><Text accessibilityRole="alert" style={{ color: theme.accent, flex: 1, fontWeight: '700' }}>{success}</Text></Row></Card> : null}
+    {mode !== 'meal' && error ? <Card><Text accessibilityRole="alert" style={{ color: theme.red }}>{error}</Text></Card> : null}
+    <Disclosure title={date === today() ? 'Logging for today' : `Logging for ${date}`} subtitle="Tap to change date or fill a past gap"><DaySelector value={date} onChange={setDate} /><Text style={ui.muted}>Edit existing entries in Progress / Daily history.</Text></Disclosure>
     {mode === 'meal' ? <Reveal key="meal" style={{ gap: 18 }}>
       <Card>
-        <Text style={{ color: theme.text, fontSize: 19, fontWeight: '800' }}>What did you eat?</Text>
+        <Text style={{ color: theme.text, fontSize: 19, fontFamily: theme.font }}>What did you eat?</Text>
         <Label>MEAL</Label>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
           {(['breakfast', 'lunch', 'dinner', 'snack'] as const).map((type) =>
             <MotionPressable key={type} onPress={() => { setMealType(type); setEstimate(null); }} accessibilityState={{ selected: mealType === type }}
-              style={{ paddingHorizontal: 12, paddingVertical: 9, borderRadius: 11, backgroundColor: mealType === type ? 'rgba(118,240,219,0.17)' : theme.cardAlt, borderWidth: 1, borderColor: mealType === type ? 'rgba(118,240,219,0.55)' : theme.line }}>
-              <Text style={{ color: mealType === type ? theme.accent : theme.text, fontWeight: '800', fontSize: 11, textTransform: 'capitalize' }}>{type}</Text>
+              style={{ paddingHorizontal: 12, paddingVertical: 9, borderRadius: 11, backgroundColor: mealType === type ? 'rgba(212,248,120,0.17)' : theme.cardAlt, borderWidth: 1, borderColor: mealType === type ? 'rgba(212,248,120,0.55)' : theme.line }}>
+              <Text style={{ color: mealType === type ? theme.accent : theme.text, fontFamily: theme.font, fontSize: 11, textTransform: 'capitalize' }}>{type}</Text>
             </MotionPressable>)}
         </View>
         {existing && <Text style={{ color: theme.orange, fontSize: 12 }}>Saving another {mealType} for {date} will replace the current entry. Snacks can be added more than once.</Text>}
@@ -115,10 +126,10 @@ export default function Log() {
       </Card>
       <Button onPress={analyze} disabled={estimating}>{estimating ? 'Estimating…' : estimate ? 'Estimate again' : 'Estimate nutrition with AI'}</Button>
       {error ? <Reveal><Card><Text style={{ color: theme.red }}>{error}</Text></Card></Reveal> : null}
-      {estimate && <Reveal><Card style={{ backgroundColor: 'rgba(45,104,106,0.28)', borderColor: 'rgba(118,240,219,0.3)' }}>
-        <Row><Icon name="sparkles" color={theme.accent} size={19} /><Text style={{ color: theme.accent, fontWeight: '800', fontSize: 10, letterSpacing: 1 }}>AI ESTIMATE · REVIEW BEFORE SAVING</Text></Row>
-        <Text style={{ color: theme.text, fontSize: 20, fontWeight: '800' }}>{estimate.name}</Text>
-        <Text style={{ color: theme.text, fontSize: 27, fontWeight: '800' }}>~{Math.round(estimate.calories)} kcal</Text>
+      {estimate && <Reveal><Card style={{ backgroundColor: theme.hero, borderColor: 'rgba(212,248,120,0.3)' }}>
+        <Row><Icon name="sparkles" color={theme.accent} size={19} /><Text style={{ color: theme.accent, fontFamily: theme.font, fontSize: 10, letterSpacing: 1 }}>AI ESTIMATE · REVIEW BEFORE SAVING</Text></Row>
+        <Text style={{ color: theme.text, fontSize: 20, fontFamily: theme.font }}>{estimate.name}</Text>
+        <Text style={{ color: theme.text, fontSize: 27, fontFamily: theme.font }}>~{Math.round(estimate.calories)} kcal</Text>
         <Text style={{ color: theme.text }}>Protein {Math.round(estimate.protein)} g · Carbs {Math.round(estimate.carbs)} g · Fat {Math.round(estimate.fat)} g</Text>
         <Text style={ui.muted}>Fibre {Math.round(estimate.fibre)} g · Sugar {Math.round(estimate.sugar)} g</Text>
         <Text style={ui.muted}>Assumptions: {estimate.assumptions}</Text>
@@ -126,7 +137,7 @@ export default function Log() {
         <Button onPress={saveMeal}>{existing ? `Replace ${mealType}` : 'Save meal'}</Button>
       </Card></Reveal>}
     </Reveal> : <Reveal key={mode}><Card>
-      <Text style={{ color: theme.text, fontSize: 19, fontWeight: '800' }}>{mode === 'weight' ? 'Weight check-in' : mode === 'water' ? 'Hydration check-in' : mode === 'steps' ? 'Steps check-in' : 'Workout details'}</Text>
+      <Text style={{ color: theme.text, fontSize: 19, fontFamily: theme.font }}>{mode === 'weight' ? 'Weight check-in' : mode === 'water' ? 'Hydration check-in' : mode === 'steps' ? 'Steps check-in' : 'Workout details'}</Text>
       {mode === 'weight' ? <><Label>WEIGHT (KG)</Label><Input value={weight} onChangeText={setWeight} keyboardType="decimal-pad" placeholder="e.g. 72.5" /></> :
         mode === 'water' ? <><Label>AMOUNT (ML)</Label><Input value={water} onChangeText={setWater} keyboardType="number-pad" placeholder="e.g. 250" /></> :
         mode === 'steps' ? <><Label>STEPS</Label><Input value={steps} onChangeText={setSteps} keyboardType="number-pad" placeholder="e.g. 3200" /></> :

@@ -25,7 +25,7 @@ OpenAI and Claude default to `gpt-4o-mini` and `claude-haiku-5-5`, configurable 
 
 Onboarding sends the entered profile to the selected provider to generate a weekly plan. The server validates the day structure and bounds the returned numbers; a light, moderate, or aggressive pace changes the permitted calorie range, while recovery is still required. For users under 20, users needing special dietary care, those skipping the metabolic equation, or weight loss at a low BMI, the app pauses personal calorie and drink targets. These are starting estimates, not measured deficits or medical prescriptions. In chat, **Update my plan using this chat** generates and saves a revised plan from the conversation.
 
-History lets you jump to any past date, add missing meals, workouts, weigh-ins, water, or steps, and edit or delete existing entries. Today keeps current-day guides at the top, followed by 7-day and 30-day charts for steps, water, food calories, and training time. Profile details are read-only until you confirm an edit; the final save rebuilds the plan with AI, then saves the profile and plan together.
+History lets you jump to any past date, add missing meals, workouts, weigh-ins, water, or steps, and edit or delete existing entries. Today prioritizes the current session, quick check-ins, and daily guides. Progress brings together consistency, 7-day and 30-day charts for steps, hydration, food energy, training time, and recorded weigh-ins, with a Daily history view for editing entries. Chart averages use days with entries; gaps remain unknown. Profile details are read-only until you confirm an edit; the final save rebuilds the plan with AI, then saves the profile and plan together.
 
 Weekly reviews cover consecutive 7-day periods from setup; monthly reviews cover anniversaries of the setup date. After each period ends, the app creates one AI review the next time it is open online and stores it on the account server. Older saved reviews can be opened without another AI call, and coach chat can use them when asked about historical progress. Daily logs remain device-local, so a review summarizes entries available on the device that generated it. Editing an old entry changes charts but does not rewrite an already saved review.
 
@@ -46,3 +46,7 @@ Logs are stored on the device with AsyncStorage, scoped by account. Profile deta
 ## Android and iOS builds
 
 The shared app targets both Android and iOS. Once signed in to an Expo account, use `npx eas-cli@latest build --platform all --profile preview` for installable test builds or `npx eas-cli@latest build --platform all --profile production` for store builds. EAS will ask for the Android package name, iOS bundle identifier, and signing credentials on first setup. The `preview` profile produces an Android APK and an internally distributed iOS build; the `production` profile produces an Android App Bundle and an iOS store build.
+
+## UI redesign
+
+The Kinetic design uses graphite surfaces, electric lime actions, metric colors, a bundled Space Grotesk heading font, and restrained glass gradients. See [design notes](docs/ui-redesign.md) for the screen map, research, analytics semantics, and validation status.

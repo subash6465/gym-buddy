@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -8,6 +9,8 @@ import { theme } from '@/lib/theme';
 import { MotionProvider } from '@/lib/motion';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import ReviewAutomation from '@/components/ReviewAutomation';
+
+SplashScreen.preventAutoHideAsync().catch(console.warn);
 
 function Routes() {
   const auth = useAuth();
@@ -22,6 +25,10 @@ function Routes() {
 }
 
 export default function RootLayout() {
-  useEffect(() => { SplashScreen.hideAsync().catch(console.warn); }, []);
+  const [fontsLoaded, fontError] = useFonts({
+    SpaceGroteskBold: require('../../assets/fonts/SpaceGrotesk-700.ttf'),
+  });
+  useEffect(() => { if (fontsLoaded || fontError) SplashScreen.hideAsync().catch(console.warn); }, [fontsLoaded, fontError]);
+  if (!fontsLoaded && !fontError) return null;
   return <SafeAreaProvider><MotionProvider><AuthProvider><StoreProvider><Routes /></StoreProvider></AuthProvider></MotionProvider></SafeAreaProvider>;
 }

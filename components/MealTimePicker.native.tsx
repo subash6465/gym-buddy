@@ -15,6 +15,6 @@ export default function MealTimePicker({ value, onChange }: { value: string; onC
   };
   return <View><Pressable onPress={showPicker} accessibilityRole="button" accessibilityLabel={`Selected time ${value}`} style={{ backgroundColor: theme.cardAlt, borderWidth: 1, borderColor: theme.line, borderRadius: 14, padding: 15 }}><Text style={{ color: theme.text, fontSize: 16 }}>{value}</Text></Pressable>
     {open && <DateTimePicker value={date} mode="time" display="spinner" onValueChange={(_, selected) => selectTime(selected)} onDismiss={() => setOpen(false)} />}
-    {open && Platform.OS === 'ios' && <Pressable onPress={() => setOpen(false)} style={{ alignSelf: 'flex-end', padding: 10 }}><Text style={{ color: theme.accent, fontWeight: '800' }}>Done</Text></Pressable>}
+    {open && Platform.OS === 'ios' && <Pressable onPress={() => setOpen(false)} style={{ alignSelf: 'flex-end', padding: 10 }}><Text style={{ color: theme.accent, fontFamily: theme.font }}>Done</Text></Pressable>}
   </View>;
 }
