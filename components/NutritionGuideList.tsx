@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Text, View } from 'react-native';
 import { Row, ui } from './UI';
 import type { NutritionPlan, NutritionGuide } from '@/lib/plan';
@@ -21,14 +22,13 @@ export default function NutritionGuideList({ nutrition, previous }: { nutrition?
     {primaryMacroKeys.map((key) => {
       const subset = macroSubsets[key];
       const changedSubset = subset && previous && guideValue(previous.guides[subset]) !== guideValue(nutrition.guides[subset]);
+      const header = (arrow?: ReactNode) => <Row>{arrow || <View style={{ width: 12 }} />}<Text style={{ color: theme.text, fontWeight: '700', flex: 1 }}>{macroLabels[key]}</Text><Text style={{ color: theme.accent, fontWeight: '700', maxWidth: '55%', textAlign: 'right' }}>{guideValue(nutrition.guides[key])}</Text></Row>;
       return <View key={key} style={{ gap: 7, borderTopWidth: 1, borderColor: theme.line, paddingTop: 12 }}>
-        <Row><Text style={{ color: theme.text, fontWeight: '700', flex: 1 }}>{macroLabels[key]}</Text><Text style={{ color: theme.accent, fontWeight: '700', maxWidth: '55%', textAlign: 'right' }}>{guideValue(nutrition.guides[key])}</Text></Row>
-        {details(key)}
-        {subset ? <NutritionDetails label={`Includes ${macroLabels[subset].toLowerCase()}${changedSubset ? ' / Guide changed' : ''}`} initiallyOpen={Boolean(changedSubset)}>
+        {subset ? <NutritionDetails label={`${macroLabels[key]}: ${guideValue(nutrition.guides[key])}. Includes ${macroLabels[subset].toLowerCase()}.`} header={header} summary={<View style={{ gap: 5, marginLeft: 24 }}>{details(key)}</View>} initiallyOpen={Boolean(changedSubset)}>
           <Row><Text style={[ui.muted, { flex: 1, fontSize: 12 }]}>{macroLabels[subset]}</Text><Text style={{ color: theme.accent, fontWeight: '600', fontSize: 12, maxWidth: '55%', textAlign: 'right' }}>{guideValue(nutrition.guides[subset])}</Text></Row>
           {details(subset)}
           <Text style={[ui.muted, { fontSize: 11 }]}>Already included in {macroLabels[key].toLowerCase()}. This limit is not an additional allowance.</Text>
-        </NutritionDetails> : null}
+        </NutritionDetails> : <><View style={{ minHeight: 28, justifyContent: 'center' }}>{header()}</View><View style={{ gap: 5, marginLeft: 24 }}>{details(key)}</View></>}
       </View>;
     })}
   </View>;
