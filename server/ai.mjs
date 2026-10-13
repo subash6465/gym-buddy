@@ -5,7 +5,7 @@ const models = {
 const googleModels = {
   verification: () => process.env.GEMINI_VERIFICATION_MODEL || 'gemma-4-26b-a4b-it',
   planning: () => process.env.GEMINI_PLANNING_MODEL || process.env.GEMINI_MODEL || 'gemini-3.8-flash',
-  chat: () => process.env.GEMINI_CHAT_MODEL || 'gemma-4-31b-it',
+  chat: () => process.env.GEMINI_CHAT_MODEL || 'gemini-3.1-flash-lite',
   meal: () => process.env.GEMINI_MEAL_MODEL || 'gemini-3.5-flash-lite',
   review: () => process.env.GEMINI_REVIEW_MODEL || 'gemini-3.8-flash',
 };
@@ -82,7 +82,9 @@ export async function generate({ provider, apiKey, instructions, messages, image
     url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(googleModels[task]())}:generateContent`;
     headers = { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' };
     const generationConfig = { ...(gemmaChat ? { thinkingConfig: { thinkingLevel: 'minimal' } } : {}),
-      ...(jsonSchema && !gemmaChat ? { responseFormat: { text: { mimeType: 'application/json', schema: jsonSchema } } } : {}) };
+      ...(jsonSchema && !gemmaChat ? task === 'chat'
+        ? { responseMimeType: 'application/json', responseJsonSchema: jsonSchema }
+        : { responseFormat: { text: { mimeType: 'application/json', schema: jsonSchema } } } : {}) };
     const systemText = gemmaChat && jsonSchema ? `${instructions}\nReturn only a JSON object matching this schema: ${JSON.stringify(jsonSchema)}. No Markdown or extra text.` : instructions;
     body = { systemInstruction: { parts: [{ text: systemText }] },
       contents: messages.map((message, index) => ({ role: message.role === 'assistant' ? 'model' : 'user', parts: [

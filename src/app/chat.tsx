@@ -11,6 +11,7 @@ import { parseDay, formatDate, displayDatesInText } from '@/lib/dates';
 import { planTargets } from '@/lib/targets';
 import type { AiPlan } from '@/lib/plan';
 import { theme } from '@/lib/theme';
+import { chatClock, serializeChatContext } from '@/lib/chat-context';
 
 type Proposal = { action: ChatAction; oldValue: number; newValue: number; status: 'pending' | 'approved' | 'rejected' | 'stale' };
 type PlanProposal = { plan: AiPlan; prior: AiPlan | null; ticket: string; status: 'pending' | 'approved' | 'rejected' };
@@ -58,19 +59,24 @@ export default function Chat() {
     if (!content || busy || revising) return;
     const next: Message[] = [...messages, { role: 'user', content }];
     setMessages(next); setDraft(''); setError(''); setBusy(true);
-    const date = today();
+    const now = new Date();
+    const date = today(now);
     const meals = store.meals.filter((x) => x.date === date);
     const workouts = store.workouts.filter((x) => x.date === date);
     const targets = planTargets(store.profile, store.weighIns[0]?.kg, auth.plan);
-    const context = JSON.stringify({ date, goal: store.profile.goal, workoutLocation: store.profile.setting,
+    const context = serializeChatContext({ date, ...chatClock(now), goal: store.profile.goal, workoutLocation: store.profile.setting,
       allergies: store.profile.allergies, concerns: store.profile.concerns,
-      healthConditions: store.profile.healthConditions || [], nutritionGuides: auth.plan?.nutrition?.guides, todaysMeals: meals.map((x) => ({ name: x.name, calories: x.calories, protein: x.protein })),
+      healthConditions: store.profile.healthConditions || [], nutritionGuides: auth.plan?.nutrition?.guides,
+      todaysMealTotals: { count: meals.length, calories: meals.reduce((sum, x) => sum + x.calories, 0), protein: meals.reduce((sum, x) => sum + x.protein, 0),
+        mealTypes: [...new Set(meals.map((x) => x.type))] },
+      todaysMeals: meals.map((x) => ({ name: x.name, type: x.type, time: x.time, calories: x.calories, protein: x.protein })),
+      todaysWorkoutTotals: { count: workouts.length, minutes: workouts.reduce((sum, x) => sum + x.minutes, 0) },
       todaysWorkouts: workouts.map((x) => ({ name: x.name, minutes: x.minutes })),
       waterMl: store.water[date] || 0, steps: store.stepEntries.filter((x) => x.date === date).reduce((sum, x) => sum + x.count, 0),
       calorieGuide: targets?.calories, proteinGuide: targets?.protein, stepsGuide: auth.plan?.stepsTarget,
       weeklyPlan: auth.plan?.days.map((day) => ({ day: day.day, title: day.title, activities: day.activities })) });
     try {
-      const result = await auth.chat(next.slice(-20).map(({ role, content }) => ({ role, content })), context.slice(0, 3000), store.weighIns[0]?.kg);
+      const result = await auth.chat(next.slice(-20).map(({ role, content }) => ({ role, content })), context, store.weighIns[0]?.kg);
       const action = result.action;
       const valid = action && parseDay(action.date) && action.date <= today() &&
         (action.kind === 'water' ? Number.isInteger(action.value) && action.value > 0 && action.value <= 5000

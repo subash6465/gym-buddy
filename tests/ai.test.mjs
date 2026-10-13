@@ -93,12 +93,12 @@ test('routes each Google task to its configured default model', async () => {
         messages: [{ role: 'user', content: 'Hello' }] });
     }
     assert.deepEqual(urls.map((url) => url.match(/\/models\/([^:]+):generateContent$/)[1]), [
-      'gemma-4-26b-a4b-it', 'gemini-3.8-flash', 'gemma-4-31b-it', 'gemini-3.5-flash-lite',
+      'gemma-4-26b-a4b-it', 'gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-3.5-flash-lite',
     ]);
   } finally { globalThis.fetch = original; }
 });
 
-test('coach requests minimal Gemma thinking and returns only final answer parts', async () => {
+test('Flash-Lite coach returns only final answer parts', async () => {
   const original = globalThis.fetch;
   let request;
   globalThis.fetch = async (_url, options) => {
@@ -111,12 +111,12 @@ test('coach requests minimal Gemma thinking and returns only final answer parts'
   try {
     const reply = await generate({ provider: 'gemini', task: 'chat', apiKey: 'private-test-key', instructions: 'Reply briefly',
       messages: [{ role: 'user', content: 'Hello' }] });
-    assert.equal(request.generationConfig.thinkingConfig.thinkingLevel, 'minimal');
+    assert.equal(request.generationConfig?.thinkingConfig, undefined);
     assert.equal(reply, 'Please review the proposed change.');
   } finally { globalThis.fetch = original; }
 });
 
-test('Gemma coach gets a single prompt-based JSON request without unsupported schema formatting', async () => {
+test('Flash-Lite coach gets a single structured JSON request', async () => {
   const original = globalThis.fetch;
   const calls = [];
   globalThis.fetch = async (_url, options) => {
@@ -127,9 +127,10 @@ test('Gemma coach gets a single prompt-based JSON request without unsupported sc
     await generate({ provider: 'gemini', task: 'chat', apiKey: 'private-test-key', instructions: 'Reply briefly',
       messages: [{ role: 'user', content: 'Hello' }], jsonSchema: { type: 'object', properties: { reply: { type: 'string' } } } });
     assert.equal(calls.length, 1);
-    assert.equal(calls[0].generationConfig.thinkingConfig.thinkingLevel, 'minimal');
-    assert.equal(calls[0].generationConfig.responseFormat, undefined);
-    assert.match(calls[0].systemInstruction.parts[0].text, /Return only a JSON object matching this schema/);
+    assert.equal(calls[0].generationConfig.thinkingConfig, undefined);
+    assert.equal(calls[0].generationConfig.responseMimeType, 'application/json');
+    assert.deepEqual(calls[0].generationConfig.responseJsonSchema, { type: 'object', properties: { reply: { type: 'string' } } });
+    assert.equal(calls[0].systemInstruction.parts[0].text, 'Reply briefly');
   } finally { globalThis.fetch = original; }
 });
 
