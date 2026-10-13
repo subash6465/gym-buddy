@@ -1,8 +1,10 @@
 import type { NutritionPlan, NutritionKey } from './plan';
 export type MacroKey = NutritionKey;
 export type MacroAmounts = Record<'protein' | 'carbs' | 'fat' | 'fibre' | 'sugar', number> & { addedSugar?: number | null; saturatedFat?: number | null };
-export const macroLabels: Record<MacroKey, string> = { protein: 'Protein', carbs: 'Carbs', fat: 'Fat', fibre: 'Fibre', sugar: 'Total sugar', addedSugar: 'Added sugar', saturatedFat: 'Saturated fat' };
+export const macroLabels: Record<MacroKey, string> = { protein: 'Protein', carbs: 'Carbs', fat: 'Total fat', fibre: 'Fibre', sugar: 'Total sugar', addedSugar: 'Added sugar', saturatedFat: 'Saturated fat' };
 export const macroKeys: MacroKey[] = ['protein', 'carbs', 'fat', 'fibre', 'sugar', 'addedSugar', 'saturatedFat'];
+export const primaryMacroKeys = ['protein', 'carbs', 'fat', 'fibre', 'sugar'] as const;
+export const macroSubsets: Partial<Record<MacroKey, 'saturatedFat' | 'addedSugar'>> = { fat: 'saturatedFat', sugar: 'addedSugar' };
 
 // Adult reference ranges from EFSA. These are daily guides, not meal prescriptions.
 // https://www.efsa.europa.eu/en/press/news/nda100326

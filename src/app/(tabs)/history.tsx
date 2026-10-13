@@ -1,12 +1,13 @@
 import MacroBreakdown from '@/components/MacroBreakdown';
-import { macroAmount, macroGuides, macroKeys, macroLabels, macroTotals } from '@/lib/macros';
+import { macroTotals } from '@/lib/macros';
+import NutritionDetails from '@/components/NutritionDetails';
 import { useMemo, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import ProgressHub from '@/components/ProgressHub';
 import DaySelector from '@/components/DaySelector';
 import { Button, Card, Page, Row, Title, ui } from '@/components/UI';
-import { today, useStore } from '@/lib/store';
+import { today, useStore, type Meal } from '@/lib/store';
 import { planTargets } from '@/lib/targets';
 import { useAuth } from '@/lib/auth';
 import { theme } from '@/lib/theme';
@@ -16,7 +17,7 @@ const number = (value: number) => Math.round(value).toLocaleString();
 const displayDate = formatDate;
 const displayTime = (time: string) => { const [hours, minutes] = time.split(':').map(Number); return new Date(2000, 0, 1, hours, minutes).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }); };
 
-type Event = { id: string; time?: string; title: string; detail: string; kind: string; entryKind?: 'meal' | 'workout' | 'weight' | 'water' | 'steps' | 'legacy-water' };
+type Event = { id: string; time?: string; title: string; detail: string; kind: string; meal?: Meal; entryKind?: 'meal' | 'workout' | 'weight' | 'water' | 'steps' | 'legacy-water' };
 
 export default function History() {
   const { date, view } = useLocalSearchParams<{ date?: string; view?: string }>();
@@ -45,9 +46,8 @@ function HistoryContent({ initialDate, initialView }: { initialDate: string; ini
   const exerciseMinutes = workouts.reduce((sum, workout) => sum + workout.minutes, 0);
   const weight = store.weighIns.find((x) => x.date <= selected)?.kg;
   const targets = planTargets(store.profile, weight, auth.plan, new Date(`${selected}T12:00:00`));
-  const guides = macroGuides(targets, auth.plan?.nutrition);
   const events: Event[] = ([
-    ...meals.map((x) => ({ id: x.id, time: x.time, kind: x.type.toUpperCase(), entryKind: 'meal' as const, title: x.name, detail: `${number(x.calories)} kcal / This meal vs daily guide\n${macroKeys.map((key) => `${macroLabels[key]} ${macroAmount(x[key], guides[key])}`).join(' / ')}${x.note ? `\n${x.note}` : ''}` })),
+    ...meals.map((x) => ({ id: x.id, time: x.time, kind: x.type.toUpperCase(), entryKind: 'meal' as const, title: x.name, meal: x, detail: `${number(x.calories)} kcal${x.note ? `\n${x.note}` : ''}` })),
     ...workouts.map((x) => ({ id: x.id, time: x.time, kind: 'WORKOUT', entryKind: 'workout' as const, title: x.name, detail: `${number(x.minutes)} min${x.note ? ` · ${x.note}` : ''}` })),
     ...waters.map((x) => ({ id: x.id, time: x.time, kind: 'WATER', entryKind: 'water' as const, title: `${number(x.ml)} ml water`, detail: 'Drink logged' })),
     ...steps.map((x) => ({ id: x.id, time: x.time, kind: 'STEPS', entryKind: 'steps' as const, title: `${number(x.count)} steps`, detail: 'Steps logged' })),
@@ -79,6 +79,7 @@ function HistoryContent({ initialDate, initialView }: { initialDate: string; ini
       {events.length ? events.map((event) => <View key={event.id} style={{ borderTopWidth: 1, borderColor: theme.line, paddingTop: 12, gap: 3 }}>
         <Row><Text style={{ color: theme.accent, fontSize: 12, fontFamily: theme.font, minWidth: 70 }}>{event.time ? displayTime(event.time) : 'Time n/a'}</Text><Text style={{ color: theme.muted, fontSize: 10, fontFamily: theme.font }}>{event.kind}</Text></Row>
         <Row><Text style={{ color: theme.text, fontSize: 16, fontFamily: theme.font, flex: 1 }}>{event.title}</Text>{event.entryKind ? <Pressable accessibilityRole="button" accessibilityLabel={`Edit ${event.kind.toLowerCase()} entry`} style={{ minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' }} onPress={() => router.push({ pathname: '/edit-entry', params: { kind: event.entryKind, id: event.id } })}><Text style={{ color: theme.accent, fontFamily: theme.font }}>Edit</Text></Pressable> : null}</Row><Text style={ui.muted}>{displayDatesInText(event.detail)}</Text>
+        {event.meal ? <NutritionDetails label="Meal nutrition / daily guides"><MacroBreakdown amounts={event.meal} targets={targets} label="This meal / daily guide" /></NutritionDetails> : null}
       </View>) : <Text style={ui.muted}>No activity logged for this day.</Text>}
     </Card>
   </Page>;
