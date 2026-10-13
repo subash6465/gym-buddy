@@ -1,3 +1,4 @@
+import NutritionStatus from '@/components/NutritionStatus';
 import { displayDatesInText } from '@/lib/dates';
 import { planTargets } from '@/lib/targets';
 import MacroBreakdown from '@/components/MacroBreakdown';
@@ -19,8 +20,6 @@ export default function Plan() {
   const now = useClock();
   const todayIndex = (now.getDay() + 6) % 7;
   const [openDay, setOpenDay] = useState<number | null>(todayIndex);
-  const [generating, setGenerating] = useState(false);
-  const [error, setError] = useState('');
   const goalLabel = { lose: 'Weight loss', gain: 'Weight gain', maintain: 'Maintenance' }[profile.goal];
   return <Page>
     <Title eyebrow="BUILT AROUND YOU" subtitle="A clear direction. A week that fits your life.">Your training blueprint.</Title>
@@ -41,12 +40,13 @@ export default function Plan() {
         </Row></Pressable>
         {openDay === index ? <View style={{ gap: 13, paddingTop: 12, borderTopWidth: 1, borderColor: theme.line }}><Text style={ui.muted}>{displayDatesInText(day.focus)}</Text>{day.activities.map((activity, activityIndex) => <Row key={`${day.day}-${activityIndex}`}><Text style={{ color: theme.accent, fontSize: 11, fontFamily: theme.font, width: 22 }}>{String(activityIndex + 1).padStart(2, '0')}</Text><Text style={[ui.muted, { flex: 1, color: theme.text }]}>{displayDatesInText(activity)}</Text></Row>)}<Button secondary onPress={() => router.push({ pathname: '/(tabs)/log', params: { mode: 'workout', entry: String(Date.now()) } })}>Log a completed session</Button></View> : null}
       </Card>)}
+      <NutritionStatus />
       <Disclosure title="Daily guides" subtitle="Nutrition, hydration & movement">
-        {plan.calorieTarget ? <><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>{[[plan.calorieTarget.toLocaleString(), 'kcal intake'], [plan.proteinGrams, 'g protein'], [(plan.waterMl / 1000).toFixed(1), 'L drinks'], [plan.stepsTarget.toLocaleString(), 'steps']].map(([value, label]) => <View key={label} style={{ width: '47%', flexGrow: 1, padding: 14, borderRadius: 16, backgroundColor: theme.cardAlt }}><Text style={{ color: theme.text, fontSize: 23, fontFamily: theme.font }}>{value}</Text><Text style={ui.muted}>{label}</Text></View>)}</View><Text style={ui.muted}>Estimated maintenance {plan.maintenanceCalories.toLocaleString()} kcal · planned deficit {plan.deficitCalories.toLocaleString()} kcal</Text></> : <Text style={ui.muted}>Personal calorie and drink goals are paused for this profile. Steps starting point: {plan.stepsTarget.toLocaleString()} per day.</Text>}
+        {planTargets(profile, store.weighIns[0]?.kg, plan, now) ? <><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>{[[plan.calorieTarget.toLocaleString(), 'kcal intake'], [plan.proteinGrams || 'Not set', 'g protein'], [plan.waterMl > 0 ? (plan.waterMl / 1000).toFixed(1) : 'Not set', 'L drinks'], [plan.stepsTarget.toLocaleString(), 'steps']].map(([value, label]) => <View key={label} style={{ width: '47%', flexGrow: 1, padding: 14, borderRadius: 16, backgroundColor: theme.cardAlt }}><Text style={{ color: theme.text, fontSize: 23, fontFamily: theme.font }}>{value}</Text><Text style={ui.muted}>{label}</Text></View>)}</View>{plan.maintenanceCalories > 0 ? <Text style={ui.muted}>Estimated maintenance {plan.maintenanceCalories.toLocaleString()} kcal · planned deficit {plan.deficitCalories.toLocaleString()} kcal</Text> : <Text style={ui.muted}>Clinician-provided intake guide entered by you.</Text>}</> : <Text style={ui.muted}>Personal calorie and drink goals are paused for this profile. Steps starting point: {plan.stepsTarget.toLocaleString()} per day.</Text>}
         <MacroBreakdown amounts={macroTotals(store.meals.filter((meal) => meal.date === today(now)))} targets={planTargets(profile, store.weighIns[0]?.kg, plan, now)} />
       </Disclosure>
       <Disclosure title="The thinking behind your plan" subtitle="Recommendations & adjustments"><Text style={ui.muted}>{displayDatesInText(plan.guidanceNote)}</Text><Text style={ui.muted}>{plan.requestedDays} training days requested · {plan.recommendedDays} recommended</Text><Text style={ui.muted}>{displayDatesInText(plan.suggestions)}</Text></Disclosure>
       <Card><Row><Icon name="sparkles" color={theme.secondary} /><Text style={{ color: theme.text, fontSize: 18, fontFamily: theme.font }}>Make it work for you.</Text></Row><Text style={ui.muted}>Schedule changed? Talk it through with your coach, then review and approve a revised plan.</Text><Button secondary onPress={() => router.push('/chat')}>Talk to your AI coach</Button></Card>
-    </> : <Card><Icon name="plan" color={theme.accent} size={32} /><Text style={{ color: theme.text, fontSize: 20, fontFamily: theme.font }}>A plan with your name on it.</Text><Text style={ui.muted}>Generate a weekly plan from your saved profile and training preferences.</Text>{error ? <Text accessibilityRole="alert" style={{ color: theme.red }}>{error}</Text> : null}<Button disabled={generating} onPress={() => { setGenerating(true); setError(''); auth.revisePlan([{ role: 'user', content: 'Create a practical weekly plan from my saved profile and preferences.' }]).catch((cause) => setError(cause instanceof Error ? cause.message : 'Could not generate a plan.')).finally(() => setGenerating(false)); }}>{generating ? 'Building your plan…' : 'Generate my plan'}</Button></Card>}
+    </> : <Card><Icon name="plan" color={theme.accent} size={32} /><Text style={{ color: theme.text, fontSize: 20, fontFamily: theme.font }}>A plan with your name on it.</Text><Text style={ui.muted}>Generate a weekly plan from your saved profile and training preferences.</Text><Button onPress={() => router.push({ pathname: '/chat', params: { prompt: 'Create a complete training plan and personalized nutrition guides from my saved profile.' } })}>Generate a plan preview</Button></Card>}
   </Page>;
 }

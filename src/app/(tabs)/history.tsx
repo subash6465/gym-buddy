@@ -45,7 +45,7 @@ function HistoryContent({ initialDate, initialView }: { initialDate: string; ini
   const exerciseMinutes = workouts.reduce((sum, workout) => sum + workout.minutes, 0);
   const weight = store.weighIns.find((x) => x.date <= selected)?.kg;
   const targets = planTargets(store.profile, weight, auth.plan, new Date(`${selected}T12:00:00`));
-  const guides = macroGuides(targets);
+  const guides = macroGuides(targets, auth.plan?.nutrition);
   const events: Event[] = ([
     ...meals.map((x) => ({ id: x.id, time: x.time, kind: x.type.toUpperCase(), entryKind: 'meal' as const, title: x.name, detail: `${number(x.calories)} kcal / This meal vs daily guide\n${macroKeys.map((key) => `${macroLabels[key]} ${macroAmount(x[key], guides[key])}`).join(' / ')}${x.note ? `\n${x.note}` : ''}` })),
     ...workouts.map((x) => ({ id: x.id, time: x.time, kind: 'WORKOUT', entryKind: 'workout' as const, title: x.name, detail: `${number(x.minutes)} min${x.note ? ` · ${x.note}` : ''}` })),

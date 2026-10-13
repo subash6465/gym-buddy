@@ -5,7 +5,7 @@ import type { Profile } from './store';
 
 export type ReviewKind = 'weekly' | 'monthly';
 export type Review = { kind: ReviewKind; startDay: string; endDay: string; summary: string; wins: string[]; improvements: string[]; nextSteps: string[]; generatedAt: string };
-export type ReviewJob = { kind: ReviewKind; startDay: string; endDay: string; days: DailyTotals[]; profile: Pick<Profile, 'goal' | 'activity' | 'daysPerWeek' | 'pace' | 'nutritionCaution' | 'concerns' | 'allergies'>; targets: { calories: number; protein: number; water: number; steps: number } | null };
+export type ReviewJob = { kind: ReviewKind; startDay: string; endDay: string; days: DailyTotals[]; profile: Pick<Profile, 'goal' | 'activity' | 'daysPerWeek' | 'pace' | 'nutritionCaution' | 'concerns' | 'allergies' | 'healthConditions' | 'clinicianTargets'>; targets: { calories: number; protein: number; water: number; steps: number } | null };
 export type Period = Pick<Review, 'kind' | 'startDay' | 'endDay'>;
 
 function anniversary(start: string, months: number) {
@@ -35,5 +35,5 @@ export function completedPeriods(start: string, current: string): Period[] {
 export function reviewJob(period: Period, logs: Logs, profile: Profile, targets: ReviewJob['targets']): ReviewJob {
   return { ...period, days: rangeTotals(logs, period.startDay, period.endDay),
     profile: { goal: profile.goal, activity: profile.activity, daysPerWeek: profile.daysPerWeek, pace: profile.pace,
-      nutritionCaution: profile.nutritionCaution, concerns: profile.concerns, allergies: profile.allergies }, targets };
+      healthConditions: profile.healthConditions, clinicianTargets: profile.clinicianTargets, nutritionCaution: profile.nutritionCaution, concerns: profile.concerns, allergies: profile.allergies }, targets };
 }

@@ -1,4 +1,5 @@
-import { router } from 'expo-router';
+import NutritionGuideList from '@/components/NutritionGuideList';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,10 +17,11 @@ type PlanProposal = { plan: AiPlan; prior: AiPlan | null; ticket: string; status
 type Message = { role: 'user' | 'assistant'; content: string; proposal?: Proposal; planProposal?: PlanProposal };
 
 export default function Chat() {
+  const { prompt } = useLocalSearchParams<{ prompt?: string }>();
   const auth = useAuth();
   const store = useStore();
   const [messages, setMessages] = useState<Message[]>([]);
-  const [draft, setDraft] = useState('');
+  const [draft, setDraft] = useState(typeof prompt === 'string' ? prompt.slice(0, 2000) : '');
   const [busy, setBusy] = useState(false);
   const [revising, setRevising] = useState(false);
   const [error, setError] = useState('');
@@ -62,7 +64,7 @@ export default function Chat() {
     const targets = planTargets(store.profile, store.weighIns[0]?.kg, auth.plan);
     const context = JSON.stringify({ date, goal: store.profile.goal, workoutLocation: store.profile.setting,
       allergies: store.profile.allergies, concerns: store.profile.concerns,
-      todaysMeals: meals.map((x) => ({ name: x.name, calories: x.calories, protein: x.protein })),
+      healthConditions: store.profile.healthConditions || [], nutritionGuides: auth.plan?.nutrition?.guides, todaysMeals: meals.map((x) => ({ name: x.name, calories: x.calories, protein: x.protein })),
       todaysWorkouts: workouts.map((x) => ({ name: x.name, minutes: x.minutes })),
       waterMl: store.water[date] || 0, steps: store.stepEntries.filter((x) => x.date === date).reduce((sum, x) => sum + x.count, 0),
       calorieGuide: targets?.calories, proteinGuide: targets?.protein, stepsGuide: auth.plan?.stepsTarget,
@@ -114,12 +116,14 @@ export default function Chat() {
           </View> : null}
           {message.planProposal ? <View style={{ backgroundColor: theme.cardAlt, borderRadius: 12, padding: 12, gap: 8, borderWidth: 1, borderColor: theme.line }}>
             <Text style={{ color: theme.accent, fontFamily: theme.font }}>Weekly plan revision</Text>
+            <NutritionGuideList nutrition={message.planProposal.plan.nutrition} previous={message.planProposal.prior?.nutrition} />
             <Text style={{ color: theme.text, fontWeight: '700' }}>Current week</Text>
             <Text style={{ color: theme.muted }}>{message.planProposal.prior?.summary || 'No saved plan'}</Text>
             {message.planProposal.prior ? <Text style={{ color: theme.muted, fontSize: 12 }}>{message.planProposal.prior.days.map((day) => `${day.day.slice(0, 3)}: ${day.title}`).join(' · ')}</Text> : null}
             <Text style={{ color: theme.text, fontWeight: '700' }}>Proposed week</Text>
             <Text style={{ color: theme.text }}>{message.planProposal.plan.summary}</Text>
-            <Text style={{ color: theme.muted, fontSize: 12 }}>Daily goals: {message.planProposal.prior?.calorieTarget || 0} → {message.planProposal.plan.calorieTarget} kcal · {message.planProposal.prior?.proteinGrams || 0} → {message.planProposal.plan.proteinGrams} g protein · {message.planProposal.prior?.stepsTarget || 0} → {message.planProposal.plan.stepsTarget} steps</Text>
+            <Text style={{ color: theme.muted, fontSize: 12 }}>Daily goals: {message.planProposal.prior?.calorieTarget || 'Not set'} → {message.planProposal.plan.calorieTarget || 'Needs clinician input'} kcal · {message.planProposal.prior?.proteinGrams || 'Not set'} → {message.planProposal.plan.proteinGrams || 'Needs clinician input'} g protein · {message.planProposal.prior?.stepsTarget || 0} → {message.planProposal.plan.stepsTarget} steps</Text>
+            <Text style={{ color: theme.muted, fontSize: 12 }}>Drinks guide: {message.planProposal.plan.waterMl ? `${message.planProposal.plan.waterMl} ml / ${message.planProposal.plan.nutrition?.waterSource === 'clinician' ? 'Clinician-supplied' : 'Starting estimate'}` : 'Needs clinician input'}</Text>
             {message.planProposal.plan.days.map((day) => <View key={day.day} style={{ borderTopWidth: 1, borderColor: theme.line, paddingTop: 6 }}><Text style={{ color: theme.text, fontWeight: '700' }}>{day.day}: {day.title}</Text><Text style={{ color: theme.muted, fontSize: 12 }}>{day.focus} · {day.activities.join(', ')}</Text></View>)}
             {message.planProposal.status === 'pending' ? <View style={{ flexDirection: 'row', gap: 8 }}>
               <Pressable accessibilityRole="button" disabled={busy || revising} onPress={() => { void decidePlan(index, true); }} style={{ backgroundColor: theme.accent, padding: 10, borderRadius: 10, opacity: busy || revising ? .5 : 1 }}><Text style={{ color: theme.ink, fontFamily: theme.font }}>{revising ? 'Saving…' : 'Approve'}</Text></Pressable>

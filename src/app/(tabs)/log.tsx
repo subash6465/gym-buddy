@@ -67,7 +67,7 @@ export default function Log() {
   }
   function saveMeal() {
     if (!estimate) return;
-    store.addMeal({ date, time: mealTime, type: mealType, name: estimate.name, note: `${description.trim()}${estimate.assumptions ? ` · Assumptions: ${estimate.assumptions}` : ''}`, calories: estimate.calories, protein: estimate.protein, carbs: estimate.carbs, fat: estimate.fat, fibre: estimate.fibre, sugar: estimate.sugar });
+    store.addMeal({ date, time: mealTime, type: mealType, name: estimate.name, note: `${description.trim()}${estimate.assumptions ? ` · Assumptions: ${estimate.assumptions}` : ''}`, calories: estimate.calories, protein: estimate.protein, carbs: estimate.carbs, fat: estimate.fat, addedSugar: estimate.addedSugar ?? null, saturatedFat: estimate.saturatedFat ?? null, fibre: estimate.fibre, sugar: estimate.sugar });
     setDescription(''); setPhoto(null); setPhotoData(null); setEstimate(null); setMealTime(clockTime()); setError('');
     setSuccess(`Meal saved · ${formatDate(date)} at ${mealTime}`);
   }

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 const pending = new Map();
 const comparable = (plan) => plan ? JSON.stringify({ summary: plan.summary, suggestions: plan.suggestions, days: plan.days,
-  calorieTarget: plan.calorieTarget, proteinGrams: plan.proteinGrams, waterMl: plan.waterMl, stepsTarget: plan.stepsTarget }) : '';
+  calorieTarget: plan.calorieTarget, proteinGrams: plan.proteinGrams, waterMl: plan.waterMl, stepsTarget: plan.stepsTarget, nutrition: plan.nutrition || null }) : '';
 
 export function stagePlan(userId, prior, plan, profile = null) {
   if (comparable(prior) === comparable(plan)) return null;

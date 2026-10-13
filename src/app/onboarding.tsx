@@ -1,4 +1,8 @@
-import { useState } from 'react';
+import NutritionSettings from '@/components/NutritionSettings';
+import AccountPlanPreviewCard from '@/components/AccountPlanPreview';
+import { validateNutritionProfile } from '@/shared/nutrition-profile.mjs';
+import type { AccountPlanPreview } from '@/lib/auth';
+import { useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Keyboard, Platform, Pressable, Text, View } from 'react-native';
 import BirthDatePicker from '@/components/BirthDatePicker';
 import { Button, Card, Input, Label, Page, Title, ui } from '@/components/UI';
@@ -20,11 +24,13 @@ export default function Onboarding() {
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const detailsVersion = useRef(0);
+  const [preview, setPreview] = useState<AccountPlanPreview | null>(null);
   const showError = (message: string) => {
     setError(message);
     if (Platform.OS !== 'web') Alert.alert('Check your details', message);
   };
-  const set = <K extends keyof Profile>(key: K, value: Profile[K]) => { setError(''); setProfile((old) => ({ ...old, [key]: value })); };
+  const set = <K extends keyof Profile>(key: K, value: Profile[K]) => { detailsVersion.current++; setError(''); setPreview(null); setProfile((old) => ({ ...old, [key]: value })); };
   const next = async () => {
     if (busy) return;
     Keyboard.dismiss();
@@ -32,13 +38,13 @@ export default function Onboarding() {
     if (step === 0) {
       if (!profile.name.trim()) return showError('Enter your name.');
       if (ageOnDate(profile.dob) === null) return showError('Select a valid date of birth.');
-      if (Number(profile.heightCm) < 100 || Number(profile.heightCm) > 250) return showError('Enter a height from 100 to 250 cm.');
-      if (Number(weight) < 25 || Number(weight) > 400) return showError('Enter a weight from 25 to 400 kg.');
+      if (!Number.isFinite(Number(profile.heightCm)) || Number(profile.heightCm) < 100 || Number(profile.heightCm) > 250) return showError('Enter a height from 100 to 250 cm.');
+      if (!Number.isFinite(Number(weight)) || Number(weight) < 25 || Number(weight) > 400) return showError('Enter a weight from 25 to 400 kg.');
     }
     if (step < 2) { setStep(step + 1); return; }
     setBusy(true);
-    try { await store.completeOnboarding({ ...profile, name: profile.name.trim(), weightKg: Number(weight), allergies: profile.allergies.trim(), concerns: profile.concerns.trim(), fitnessPlan: profile.fitnessPlan.trim() }); }
-    catch (cause) { showError(cause instanceof Error ? cause.message : 'Could not save your details.'); }
+    try { if (preview) { await store.completeOnboarding(preview.ticket); } else { const revision = detailsVersion.current; const nutrition = validateNutritionProfile(profile); const proposed = await auth.previewAccountPlan({ ...profile, ...nutrition, name: profile.name.trim(), weightKg: Number(weight), allergies: profile.allergies.trim(), concerns: profile.concerns.trim(), fitnessPlan: profile.fitnessPlan.trim() }, true); if (revision !== detailsVersion.current) throw new Error('Your details changed while the preview was prepared. Generate a new preview.'); setPreview(proposed); } }
+    catch (cause) { if (preview) setPreview(null); showError(cause instanceof Error ? cause.message : 'Could not save your details.'); }
     finally { setBusy(false); }
   };
   return <Page key={step}>
@@ -48,7 +54,7 @@ export default function Onboarding() {
       <Label>YOUR NAME</Label><Input value={profile.name} onChangeText={(value) => set('name', value)} placeholder="What should we call you?" autoComplete="name" />
       <Label>DATE OF BIRTH</Label><BirthDatePicker value={profile.dob} onChange={(value) => set('dob', value)} />
       <Label>HEIGHT (CM)</Label><Input value={profile.heightCm} onChangeText={(value) => set('heightCm', value)} keyboardType="decimal-pad" placeholder="e.g. 170" />
-      <Label>CURRENT WEIGHT (KG)</Label><Input value={weight} onChangeText={(value) => { setError(''); setWeight(value); }} keyboardType="decimal-pad" placeholder="e.g. 70" />
+      <Label>CURRENT WEIGHT (KG)</Label><Input value={weight} onChangeText={(value) => { detailsVersion.current++; setPreview(null); setError(''); setWeight(value); }} keyboardType="decimal-pad" placeholder="e.g. 70" />
       <Text style={ui.muted}>Your age updates from your birth date. Weight is used as a starting point and can be changed later.</Text>
     </Card> : null}
     {step === 1 ? <Card>
@@ -63,7 +69,8 @@ export default function Onboarding() {
       <Label>YOUR FITNESS PLAN OR SCHEDULE</Label><Input value={profile.fitnessPlan} onChangeText={(value) => set('fitnessPlan', value)} placeholder="e.g. strength 3 days, walks on weekends" multiline style={{ minHeight: 76, textAlignVertical: 'top' }} />
       <Text style={ui.muted}>If you have a plan, describe its days and exercises. AI will organize it into a week. Leave blank to generate one.</Text>
     </Card> : null}
-    {step === 2 ? <Card>
+    {step === 2 && !preview ? <Card>
+      <NutritionSettings profile={profile} onChange={(updates) => { detailsVersion.current++; setProfile((old) => ({ ...old, ...updates })); setPreview(null); setError(''); }} />
       <Label>ALLERGIES OR FOODS TO AVOID</Label><Input value={profile.allergies} onChangeText={(value) => set('allergies', value)} placeholder="Enter details, or leave blank" multiline />
       <Label>INJURIES, PAIN, OR OTHER CONCERNS</Label><Input value={profile.concerns} onChangeText={(value) => set('concerns', value)} placeholder="Enter details, or leave blank" multiline style={{ minHeight: 76, textAlignVertical: 'top' }} />
       <Label>METABOLIC EQUATION REFERENCE</Label><Choice options={[["female", "Female equation"], ["male", "Male equation"], ["", "Skip estimates"]] as const} value={profile.equation} onChange={(value) => set('equation', value)} />
@@ -71,9 +78,10 @@ export default function Onboarding() {
       <Pressable onPress={() => set('nutritionCaution', !profile.nutritionCaution)} accessibilityRole="checkbox" accessibilityState={{ checked: profile.nutritionCaution }} style={{ padding: 14, borderRadius: 12, backgroundColor: theme.cardAlt }}><Text style={{ color: theme.text, fontWeight: '700' }}>{profile.nutritionCaution ? '☑' : '□'} Pregnancy, breastfeeding, or a condition needing a special diet</Text></Pressable>
       <Text style={ui.muted}>Automatic nutrition targets pause when special dietary care is selected. This plan does not diagnose or treat injuries or allergies.</Text>
     </Card> : null}
+    {preview ? <AccountPlanPreviewCard plan={preview.plan} /> : null}
     {error ? <Text accessibilityRole="alert" style={{ color: theme.red }}>{error}</Text> : null}
     {busy ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}><ActivityIndicator color={theme.accent} /><Text style={ui.muted}>Reviewing your details and building your weekly plan…</Text></View> : null}
     <Button onPress={next} disabled={busy}>{busy ? 'Building your plan…' : step === 2 ? 'Generate my plan' : 'Continue'}</Button>
-    {step > 0 ? <Button secondary onPress={() => { if (!busy) { setError(''); setStep(step - 1); } }}>Back</Button> : <Button secondary onPress={() => { void auth.signOut(); }}>Sign out</Button>}
+    {step > 0 ? <Button secondary onPress={() => { if (!busy) { setError(''); if (preview) setPreview(null); else setStep(step - 1); } }}>Back</Button> : <Button secondary onPress={() => { void auth.signOut(); }}>Sign out</Button>}
   </Page>;
 }

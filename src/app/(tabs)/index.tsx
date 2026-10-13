@@ -1,3 +1,4 @@
+import NutritionStatus from '@/components/NutritionStatus';
 import MacroBreakdown from '@/components/MacroBreakdown';
 import { macroTotals } from '@/lib/macros';
 import { formatDate } from '@/lib/dates';
@@ -45,6 +46,8 @@ export default function Today() {
     ...workouts.map((item) => ({ id: item.id, time: item.time, title: item.name, detail: `${item.minutes} min training`, icon: 'workout' as const, color: theme.accent })),
   ].sort((a, b) => (b.time || '').localeCompare(a.time || '')).slice(0, 3);
 
+  const proteinGuide = auth.plan?.nutrition ? auth.plan.proteinGrams : targets?.protein;
+  const waterGuide = auth.plan?.nutrition ? auth.plan.waterMl : targets?.water;
   return <Page>
     <Title eyebrow={`${now.toLocaleDateString(undefined, { weekday: 'long' })} / ${formatDate(now)}`} subtitle="Small steps. Stronger every day.">{firstName ? `Let's move, ${firstName}.` : 'Make today count.'}</Title>
     <Card style={{ backgroundColor: theme.hero, borderColor: theme.heroLine, padding: 22 }}>
@@ -61,8 +64,8 @@ export default function Today() {
     <Row><Text style={s.section}>Daily balance</Text><Text style={[ui.muted, { fontSize: 11 }]}>{meals.length} meals logged</Text></Row>
     <Card><Row><View style={{ flex: 1, gap: 5 }}><Text style={ui.label}>ENERGY INTAKE</Text><Text style={{ color: theme.text, fontSize: 34, fontFamily: theme.font, letterSpacing: -2 }}>{Math.round(calories).toLocaleString()}</Text><Text style={{ color: theme.muted, fontSize: 12 }}>kcal{targets ? ` / ${targets.calories.toLocaleString()} guide` : ' today'}</Text><Text style={{ color: theme.accent, fontSize: 12, lineHeight: 18, marginTop: 6 }}>{targets ? calories > targets.calories ? `${Math.round(calories - targets.calories).toLocaleString()} kcal above guide` : `${Math.round(targets.calories - calories).toLocaleString()} kcal to guide` : 'Personal guide not set'}</Text></View><Orbit size={112} value={calories} max={targets?.calories || 0} /></Row><Text style={[ui.muted, { fontSize: 11 }]}>An intake guide, not a measured energy deficit.</Text></Card>
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-      <Metric icon="protein" label="Protein" value={`${Math.round(protein)} g`} guide={targets ? `of ${targets.protein} g guide` : 'No personal guide'} fraction={targets ? protein / targets.protein : 0} color={theme.nutrition} onPress={() => log('meal')} />
-      <Metric icon="water" label="Hydration" value={`${(water / 1000).toFixed(1)} L`} guide={targets ? `of ${(targets.water / 1000).toFixed(1)} L drinks guide` : 'No personal guide'} fraction={targets ? water / targets.water : 0} color={theme.hydration} onPress={() => log('water')} />
+      <Metric icon="protein" label="Protein" value={`${Math.round(protein)} g`} guide={proteinGuide ? `of ${proteinGuide} g guide` : 'No personal guide'} fraction={proteinGuide ? protein / proteinGuide : 0} color={theme.nutrition} onPress={() => log('meal')} />
+      <Metric icon="water" label="Hydration" value={`${(water / 1000).toFixed(1)} L`} guide={waterGuide ? `of ${(waterGuide / 1000).toFixed(1)} L drinks guide` : 'No personal guide'} fraction={waterGuide ? water / waterGuide : 0} color={theme.hydration} onPress={() => log('water')} />
       <Metric icon="steps" label="Steps" value={steps.toLocaleString()} guide={auth.plan?.stepsTarget ? `of ${auth.plan.stepsTarget.toLocaleString()} daily guide` : 'Manually logged'} fraction={auth.plan?.stepsTarget ? steps / auth.plan.stepsTarget : 0} color={theme.secondary} onPress={() => log('steps')} />
       <Metric icon="workout" label="Training" value={`${minutes} min`} guide={`${workouts.length} sessions logged today`} fraction={todayPlan?.minutes ? minutes / todayPlan.minutes : 0} color={theme.accent} onPress={() => log('workout')} />
     </View>
@@ -71,6 +74,7 @@ export default function Today() {
     <MotionPressable onPress={() => router.push('/chat')} style={{ width: '100%' }}><Card style={{ width: '100%' }}><Row><View style={s.coachIcon}><Icon name="sparkles" color={theme.secondary} size={23} /></View><View style={{ flex: 1, gap: 4 }}><Text style={{ color: theme.text, fontSize: 17, fontFamily: theme.font }}>A little guidance goes far.</Text><Text style={ui.muted}>Talk meals, training & goals with your AI coach.</Text></View><Icon name="arrow" color={theme.muted} size={17} /></Row></Card></MotionPressable>
     <Row><Text style={s.section}>Today’s activity</Text><Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/(tabs)/history', params: { view: 'history' } })} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: theme.accent, fontSize: 12, fontWeight: '700' }}>See history ↗</Text></Pressable></Row>
     <Card>{recent.length ? recent.map((item) => <Row key={item.id}><View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: `${item.color}16`, alignItems: 'center', justifyContent: 'center' }}><Icon name={item.icon} color={item.color} size={18} /></View><View style={{ flex: 1, gap: 3 }}><Text style={{ color: theme.text, fontSize: 14, fontWeight: '700' }}>{item.title}</Text><Text style={[ui.muted, { fontSize: 11 }]}>{item.detail}</Text></View></Row>) : <><Text style={{ color: theme.text, fontSize: 15, fontWeight: '700' }}>A fresh page for today.</Text><Text style={ui.muted}>Your meals and workouts will show up here as you log them. Start with a quick check-in above.</Text></>}</Card>
+    <NutritionStatus />
     <Card><Text style={s.section}>Macro breakdown</Text><MacroBreakdown amounts={macroTotals(meals)} targets={targets} /></Card>
   </Page>;
 }

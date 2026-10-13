@@ -11,6 +11,7 @@ import type { Review, ReviewJob } from './reviews';
 export type AiProvider = 'openai' | 'claude' | 'gemini';
 export type ChatAction = { kind: 'water' | 'steps' | 'weight'; mode: 'set' | 'add'; date: string; value: number };
 export type ChatReply = { reply: string; action: ChatAction | null; planPreview?: { plan: AiPlan; prior: AiPlan | null; ticket: string } | null };
+export type AccountPlanPreview = { profile: Profile; plan: AiPlan; ticket: string };
 type Account = { user: { id: string; email: string }; profile: Profile | null; startedOn: string | null; ai: { provider: AiProvider | null; configured: boolean }; plan: AiPlan | null };
 type Auth = Account & {
   ready: boolean;
@@ -18,10 +19,9 @@ type Auth = Account & {
   signIn: (email: string, password: string, create: boolean, provider: AiProvider, apiKey: string, verificationTicket: string) => Promise<void>;
   saveAiConfig: (provider: AiProvider, apiKey: string, verificationTicket: string) => Promise<void>;
   estimateMeal: (description: string, imageDataUrl: string | null) => Promise<MealEstimate>;
-  completeOnboarding: (profile: Profile) => Promise<void>;
-  revisePlan: (messages: { role: 'user' | 'assistant'; content: string }[], weightKg?: number) => Promise<void>;
+  previewAccountPlan: (profile: Profile, onboarding: boolean) => Promise<AccountPlanPreview>;
+  approveAccountPlan: (ticket: string, onboarding: boolean) => Promise<Profile>;
   approvePlan: (ticket: string) => Promise<void>;
-  recomputeProfile: (profile: Profile) => Promise<void>;
   signOut: () => Promise<void>;
   deleteAccount: (clearLocalData: () => Promise<void>) => Promise<void>;
   chat: (messages: { role: 'user' | 'assistant'; content: string }[], context: string, weightKg?: number) => Promise<ChatReply>;
@@ -43,7 +43,7 @@ async function request<T>(path: string, method: string, token?: string, body?: o
   let response: Response;
   const base = apiUrl();
   const controller = new AbortController();
-  const timeoutMs = ['/chat', '/estimate-meal', '/verify-ai-key', '/onboarding', '/plan/revise', '/profile/recompute', '/reviews'].includes(path) && method !== 'GET' ? 90_000 : 8000;
+  const timeoutMs = ['/chat', '/estimate-meal', '/verify-ai-key', '/onboarding/preview', '/profile/preview', '/reviews'].includes(path) && method !== 'GET' ? 90_000 : 8000;
   let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
     response = await Promise.race<Response>([fetch(`${base}${path}`, {
@@ -102,25 +102,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!token) throw new Error('Sign in again to continue.');
       return request<MealEstimate>('/estimate-meal', 'POST', token, { description, ...(imageDataUrl ? { imageDataUrl } : {}) });
     },
-    completeOnboarding: async (profile) => {
+    previewAccountPlan: async (profile, onboarding) => {
       if (!token) throw new Error('Sign in again to continue.');
-      const result = await request<{ profile: Profile; plan: AiPlan; startedOn: string }>('/onboarding', 'POST', token, { ...profile, startDay: localDay() });
-      setAccount((old) => ({ ...old, profile: result.profile, plan: result.plan, startedOn: result.startedOn }));
+      return request<AccountPlanPreview>(onboarding ? '/onboarding/preview' : '/profile/preview', 'POST', token, { ...profile, ...(onboarding ? { startDay: localDay() } : {}) });
     },
-    revisePlan: async (messages, weightKg) => {
+    approveAccountPlan: async (ticket, onboarding) => {
       if (!token) throw new Error('Sign in again to continue.');
-      const result = await request<{ plan: AiPlan }>('/plan/revise', 'POST', token, { messages, weightKg });
-      setAccount((old) => ({ ...old, plan: result.plan }));
+      const result = await request<{ profile: Profile; plan: AiPlan; startedOn?: string }>(onboarding ? '/onboarding/approve' : '/profile/approve', 'POST', token, { ticket });
+      setAccount((old) => ({ ...old, profile: result.profile, plan: result.plan, startedOn: result.startedOn || old.startedOn }));
+      return result.profile;
     },
     approvePlan: async (ticket) => {
       if (!token) throw new Error('Sign in again to continue.');
       const result = await request<{ plan: AiPlan }>('/plan/approve', 'POST', token, { ticket });
       setAccount((old) => ({ ...old, plan: result.plan }));
-    },
-    recomputeProfile: async (profile) => {
-      if (!token) throw new Error('Sign in again to continue.');
-      const result = await request<{ profile: Profile; plan: AiPlan }>('/profile/recompute', 'POST', token, profile);
-      setAccount((old) => ({ ...old, profile: result.profile, plan: result.plan }));
     },
     signOut: async () => {
       if (token) await request('/auth/logout', 'POST', token).catch(() => {});

@@ -3,17 +3,21 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import { withSavedMeal } from './meals';
 import { useAuth } from './auth';
 import { localDay } from './dates';
+import type { HealthCondition, ClinicianTargets } from '@/shared/nutrition-profile.mjs';
 
 export type Goal = 'lose' | 'gain' | 'maintain';
 export type Meal = {
   id: string; date: string; time: string; type: 'breakfast' | 'lunch' | 'dinner' | 'snack'; name: string; note: string;
   calories: number; protein: number; carbs: number; fat: number; fibre: number; sugar: number;
+  addedSugar?: number | null; saturatedFat?: number | null;
 };
 export type Workout = { id: string; date: string; time?: string; name: string; minutes: number; note: string };
 export type WeighIn = { id: string; date: string; kg: number };
 export type WaterEntry = { id: string; date: string; time: string; ml: number };
 export type StepEntry = { id: string; date: string; time: string; count: number };
 export type Profile = {
+  healthConditions?: HealthCondition[];
+  clinicianTargets?: ClinicianTargets;
   name: string; goal: Goal; setting: 'gym' | 'home'; dob: string; heightCm: string;
   equation: 'female' | 'male' | ''; activity: 'sedentary' | 'light' | 'moderate' | 'high'; nutritionCaution: boolean;
   allergies: string; concerns: string;
@@ -23,7 +27,7 @@ export type Profile = {
 type Data = { profile: Profile; historyStartDay: string; meals: Meal[]; workouts: Workout[]; weighIns: WeighIn[]; water: Record<string, number>; waterEntries: WaterEntry[]; stepEntries: StepEntry[] };
 type Store = Data & {
   ready: boolean;
-  completeOnboarding: (profile: Profile) => Promise<void>;
+  completeOnboarding: (ticket: string) => Promise<void>;
   replaceProfile: (profile: Profile) => void;
   addMeal: (meal: Omit<Meal, 'id'>) => void;
   editMeal: (meal: Meal) => void;
@@ -48,7 +52,7 @@ type Store = Data & {
 };
 
 const initial: Data = {
-  profile: { name: '', goal: 'maintain', setting: 'gym', dob: '', heightCm: '', equation: '', activity: 'light', nutritionCaution: false, allergies: '', concerns: '', fitnessPlan: '', weightKg: 0, daysPerWeek: 3, pace: 'moderate' },
+  profile: { name: '', goal: 'maintain', setting: 'gym', dob: '', heightCm: '', equation: '', activity: 'light', nutritionCaution: false, healthConditions: [], clinicianTargets: {}, allergies: '', concerns: '', fitnessPlan: '', weightKg: 0, daysPerWeek: 3, pace: 'moderate' },
   historyStartDay: '',
   meals: [], workouts: [], weighIns: [], water: {}, waterEntries: [], stepEntries: [],
 };
@@ -89,8 +93,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const effectiveReady = ready && auth.user.id === loadedUserId;
   const value = useMemo<Store>(() => ({
     ...data, ready: effectiveReady,
-    completeOnboarding: async (profile) => {
-      await auth.completeOnboarding(profile);
+    completeOnboarding: async (ticket) => {
+      const profile = await auth.approveAccountPlan(ticket, true);
       setData((old) => ({ ...old, profile, historyStartDay: today(), weighIns: [{ id: newId(), date: today(), kg: profile.weightKg }, ...old.weighIns] }));
     },
     replaceProfile: (profile) => setData((old) => ({ ...old, profile })),
