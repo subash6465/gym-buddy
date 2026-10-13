@@ -6,6 +6,7 @@ import { useClock } from '@/lib/clock';
 import { planTargets } from '@/lib/targets';
 import { useAuth } from '@/lib/auth';
 import { theme } from '@/lib/theme';
+import ProgressChart from '@/components/ProgressChart';
 
 const sum = (items: Meal[], key: 'calories' | 'protein' | 'carbs' | 'fat' | 'fibre' | 'sugar') =>
   items.reduce((total, item) => total + (Number(item[key]) || 0), 0);
@@ -30,6 +31,8 @@ export default function Today() {
   const calories = sum(meals, 'calories');
   const protein = sum(meals, 'protein');
   const water = store.water[date] || 0;
+  const steps = store.stepEntries.filter((item) => item.date === date).reduce((total, item) => total + item.count, 0);
+  const trainingMinutes = workouts.reduce((total, item) => total + item.minutes, 0);
   const targets = planTargets(store.profile, store.weighIns[0]?.kg, auth.plan, now);
   const todayPlan = auth.plan?.days[(now.getDay() + 6) % 7];
   const firstName = store.profile.name.trim().split(' ')[0];
@@ -75,6 +78,11 @@ export default function Today() {
       style={{ alignSelf: 'flex-end', paddingVertical: 7, paddingHorizontal: 10 }}>
       <Text style={{ color: theme.accent, fontSize: 12, fontWeight: '800' }}>+ Add 250 ml water</Text>
     </MotionPressable>
+
+    <Row><Card style={{ flex: 1, padding: 15 }}><Text style={ui.muted}>Steps today</Text><Text style={{ color: theme.text, fontSize: 23, fontWeight: '800' }}>{steps.toLocaleString()}</Text></Card><Card style={{ flex: 1, padding: 15 }}><Text style={ui.muted}>Training today</Text><Text style={{ color: theme.text, fontSize: 23, fontWeight: '800' }}>{trainingMinutes} <Text style={{ fontSize: 12, color: theme.muted }}>min</Text></Text></Card></Row>
+
+    <ProgressChart logs={store} today={date} />
+    <MotionPressable onPress={() => router.push('/reviews')} style={{ width: '100%', padding: 16, borderRadius: 18, backgroundColor: theme.cardAlt, borderWidth: 1, borderColor: theme.line }}><Row><View style={{ flex: 1 }}><Text style={{ color: theme.text, fontWeight: '800', fontSize: 17 }}>Weekly & monthly reviews</Text><Text style={ui.muted}>AI reflections saved after each completed period</Text></View><Text style={{ color: theme.accent, fontSize: 19 }}>↗</Text></Row></MotionPressable>
 
     <Row><Text style={{ color: theme.text, fontSize: 19, fontWeight: '800', flex: 1 }}>Your next move</Text>
       <Pressable onPress={() => router.push('/(tabs)/plan')} accessibilityRole="button"><Text style={{ color: theme.accent, fontWeight: '800', fontSize: 12 }}>Open plan ↗</Text></Pressable></Row>

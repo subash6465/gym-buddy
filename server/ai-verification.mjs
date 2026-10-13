@@ -9,7 +9,7 @@ export async function verifyAiKey(provider, apiKey) {
   if (!['openai', 'claude', 'gemini'].includes(provider) || typeof apiKey !== 'string' || apiKey.trim().length < 10 || apiKey.length > 500 || /\s/.test(apiKey.trim())) {
     throw Object.assign(new Error('Choose a provider and enter its API key.'), { status: 400 });
   }
-  await generate({ provider, apiKey: apiKey.trim(), instructions: 'This is a connection check. Reply with one short acknowledgement.',
+  await generate({ provider, apiKey: apiKey.trim(), task: 'verification', instructions: 'This is a connection check. Reply with one short acknowledgement.',
     messages: [{ role: 'user', content: 'Reply with OK.' }] });
   const expires = Date.now() + 10 * 60_000;
   const payload = `${provider}.${digest(apiKey.trim())}.${expires}`;

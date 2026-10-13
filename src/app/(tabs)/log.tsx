@@ -1,12 +1,15 @@
 import * as ImagePicker from 'expo-image-picker';
+import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Image, Text, View } from 'react-native';
+import DaySelector from '@/components/DaySelector';
 import MealTimePicker from '@/components/MealTimePicker';
 import { Button, Card, Icon, Input, Label, MotionPressable, Page, Reveal, Row, Title, ui } from '@/components/UI';
 import type { MealEstimate } from '@/lib/mealEstimate';
 import { useAuth } from '@/lib/auth';
 import { Meal, today, useStore } from '@/lib/store';
 import { theme } from '@/lib/theme';
+import { parseDay } from '@/lib/dates';
 
 type Mode = 'meal' | 'workout' | 'weight' | 'water' | 'steps';
 const clockTime = () => { const date = new Date(); return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`; };
@@ -14,6 +17,11 @@ const clockTime = () => { const date = new Date(); return `${String(date.getHour
 export default function Log() {
   const store = useStore();
   const auth = useAuth();
+  const params = useLocalSearchParams<{ date?: string }>();
+  const [dateOverride, setDateOverride] = useState<{ param?: string; date: string } | null>(null);
+  const routedDate = typeof params.date === 'string' && parseDay(params.date) && params.date <= today() ? params.date : today();
+  const date = dateOverride && dateOverride.param === params.date ? dateOverride.date : routedDate;
+  const setDate = (next: string) => setDateOverride({ param: params.date, date: next });
   const [mode, setMode] = useState<Mode>('meal');
   const [photo, setPhoto] = useState<string | null>(null);
   const [photoData, setPhotoData] = useState<string | null>(null);
@@ -26,7 +34,7 @@ export default function Log() {
   const [error, setError] = useState('');
   const [name, setName] = useState(''); const [note, setNote] = useState('');
   const [minutes, setMinutes] = useState(''); const [weight, setWeight] = useState(''); const [water, setWater] = useState(''); const [steps, setSteps] = useState('');
-  const existing = mealType !== 'snack' ? store.meals.find((meal) => meal.date === today() && meal.type === mealType) : null;
+  const existing = mealType !== 'snack' ? store.meals.find((meal) => meal.date === date && meal.type === mealType) : null;
 
   async function pickPhoto(camera: boolean) {
     if (camera) {
@@ -49,34 +57,35 @@ export default function Log() {
   }
   function saveMeal() {
     if (!estimate) return;
-    store.addMeal({ date: today(), time: mealTime, type: mealType, name: estimate.name, note: `${description.trim()}${estimate.assumptions ? ` · Assumptions: ${estimate.assumptions}` : ''}`, calories: estimate.calories, protein: estimate.protein, carbs: estimate.carbs, fat: estimate.fat, fibre: estimate.fibre, sugar: estimate.sugar });
+    store.addMeal({ date, time: mealTime, type: mealType, name: estimate.name, note: `${description.trim()}${estimate.assumptions ? ` · Assumptions: ${estimate.assumptions}` : ''}`, calories: estimate.calories, protein: estimate.protein, carbs: estimate.carbs, fat: estimate.fat, fibre: estimate.fibre, sugar: estimate.sugar });
     setDescription(''); setPhoto(null); setPhotoData(null); setEstimate(null); setMealTime(clockTime()); setError('');
-    Alert.alert('Meal saved', `Logged at ${mealTime}. Your daily totals have been updated.`);
+    Alert.alert('Meal saved', `Logged for ${date} at ${mealTime}.`);
   }
   function saveOther() {
     if (mode === 'weight') {
       const kg = Number(weight);
       if (!Number.isFinite(kg) || kg <= 0 || kg > 500) return Alert.alert('Check weight', 'Enter a weight in kilograms.');
-      store.addWeighIn(kg); setWeight(''); Alert.alert('Saved', 'Your weigh-in has been logged.'); return;
+      store.addWeighIn(date, kg); setWeight(''); Alert.alert('Saved', `Your weigh-in was logged for ${date}.`); return;
     }
     if (mode === 'water') {
       const ml = Number(water);
       if (!Number.isFinite(ml) || ml <= 0 || ml > 5000) return Alert.alert('Check water', 'Enter an amount in millilitres.');
-      store.addWater(today(), ml); setWater(''); Alert.alert('Saved', 'Your water has been logged.'); return;
+      store.addWater(date, ml); setWater(''); Alert.alert('Saved', `Your water was logged for ${date}.`); return;
     }
     if (mode === 'steps') {
       const count = Number(steps);
       if (!Number.isInteger(count) || count <= 0 || count > 100000) return Alert.alert('Check steps', 'Enter a valid number of steps.');
-      store.addSteps(today(), count); setSteps(''); Alert.alert('Saved', 'Your steps have been logged.'); return;
+      store.addSteps(date, count); setSteps(''); Alert.alert('Saved', `Your steps were logged for ${date}.`); return;
     }
     const duration = Number(minutes);
     if (!name.trim() || !Number.isFinite(duration) || duration <= 0 || duration > 1440) return Alert.alert('Check workout', 'Enter an activity and its duration in minutes.');
-    store.addWorkout({ date: today(), time: workoutTime, name: name.trim(), minutes: duration, note: note.trim() });
+    store.addWorkout({ date, time: workoutTime, name: name.trim(), minutes: duration, note: note.trim() });
     setName(''); setNote(''); setMinutes(''); setWorkoutTime(clockTime()); Alert.alert('Workout logged', 'Nice work showing up today.');
   }
 
   return <Page>
     <Title eyebrow="BUILD THE HABIT" subtitle="Capture the details that help you grow.">Log it. Keep moving.</Title>
+    <Card><Text style={{ color: theme.text, fontWeight: '800', fontSize: 16 }}>Log for a day</Text><DaySelector value={date} onChange={setDate} /><Text style={ui.muted}>Choose any past day to fill a gap. Existing entries can be corrected in History.</Text></Card>
     <View style={{ flexDirection: 'row', gap: 5, padding: 5, borderRadius: 16, backgroundColor: theme.cardAlt, borderWidth: 1, borderColor: theme.line }}>
       {(['meal', 'workout', 'weight', 'water', 'steps'] as const).map((option) =>
         <MotionPressable key={option} onPress={() => setMode(option)} accessibilityState={{ selected: mode === option }}
@@ -95,7 +104,7 @@ export default function Log() {
               <Text style={{ color: mealType === type ? theme.accent : theme.text, fontWeight: '800', fontSize: 11, textTransform: 'capitalize' }}>{type}</Text>
             </MotionPressable>)}
         </View>
-        {existing && <Text style={{ color: theme.orange, fontSize: 12 }}>Saving another {mealType} today will replace the current entry. Snacks can be added more than once.</Text>}
+        {existing && <Text style={{ color: theme.orange, fontSize: 12 }}>Saving another {mealType} for {date} will replace the current entry. Snacks can be added more than once.</Text>}
         <Label>TIME</Label><MealTimePicker value={mealTime} onChange={setMealTime} />
         <Label>FOOD AND PORTION</Label>
         <Input value={description} onChangeText={(value) => { setDescription(value); setEstimate(null); }} multiline placeholder="e.g. 2 chapatis (80 g), dal (150 g), paneer (100 g), oil (1 tsp)" style={{ minHeight: 94, textAlignVertical: 'top' }} />

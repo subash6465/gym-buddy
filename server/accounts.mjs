@@ -13,6 +13,18 @@ db.exec(`PRAGMA journal_mode = WAL;
   CREATE TABLE IF NOT EXISTS profiles (user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, details TEXT NOT NULL, completed_at TEXT NOT NULL, updated_at TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS ai_configs (user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, provider TEXT NOT NULL, encrypted_key TEXT NOT NULL, updated_at TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS plans (user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, details TEXT NOT NULL, updated_at TEXT NOT NULL);`);
+if (!db.prepare('PRAGMA table_info(profiles)').all().some((column) => column.name === 'start_day')) {
+  db.exec('ALTER TABLE profiles ADD COLUMN start_day TEXT');
+}
+db.exec(`CREATE TABLE IF NOT EXISTS reviews (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL,
+  start_day TEXT NOT NULL,
+  end_day TEXT NOT NULL,
+  details TEXT NOT NULL,
+  generated_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, kind, start_day)
+);`);
 
 function encryptionKey() {
   if (process.env.AI_KEY_ENCRYPTION_SECRET) return createHash('sha256').update(process.env.AI_KEY_ENCRYPTION_SECRET).digest();
@@ -59,7 +71,7 @@ const issueSession = (user) => {
   const token = randomBytes(32).toString('hex');
   db.prepare('INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)')
     .run(hash(token), user.id, new Date(Date.now() + 90 * 86400_000).toISOString());
-  return { token, user: publicUser(user), profile: getProfile(user.id), ai: publicAi(user.id), plan: getPlan(user.id) };
+  return { token, user: publicUser(user), profile: getProfile(user.id), startedOn: getStartDay(user.id), ai: publicAi(user.id), plan: getPlan(user.id) };
 };
 const getProfile = (userId) => {
   const row = db.prepare('SELECT details FROM profiles WHERE user_id = ?').get(userId);
@@ -68,6 +80,10 @@ const getProfile = (userId) => {
 const getPlan = (userId) => {
   const row = db.prepare('SELECT details FROM plans WHERE user_id = ?').get(userId);
   return row ? JSON.parse(row.details) : null;
+};
+const getStartDay = (userId) => {
+  const row = db.prepare('SELECT start_day, completed_at FROM profiles WHERE user_id = ?').get(userId);
+  return row?.start_day || row?.completed_at?.slice(0, 10) || null;
 };
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 
@@ -106,7 +122,7 @@ export function currentUser(authorization) {
 
 export function getAccount(authorization) {
   const user = currentUser(authorization);
-  return { user: publicUser(user), profile: getProfile(user.id), ai: publicAi(user.id), plan: getPlan(user.id) };
+  return { user: publicUser(user), profile: getProfile(user.id), startedOn: getStartDay(user.id), ai: publicAi(user.id), plan: getPlan(user.id) };
 }
 
 export function getAiConfig(authorization) {
@@ -154,20 +170,34 @@ export function saveProfile(authorization, profile) {
   return { profile: getProfile(user.id) };
 }
 
-export function saveOnboarding(authorization, profile, plan) {
+export function saveOnboarding(authorization, profile, plan, startDay) {
   const user = currentUser(authorization);
   validateProfile(profile);
   if (!plan || !Array.isArray(plan.days) || plan.days.length !== 7) fail('Invalid generated plan.');
+  if (typeof startDay !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(startDay) || !Number.isFinite(Date.parse(`${startDay}T00:00:00Z`)) || new Date(`${startDay}T00:00:00Z`).toISOString().slice(0, 10) !== startDay) startDay = new Date().toISOString().slice(0, 10);
   const now = new Date().toISOString();
   db.exec('BEGIN');
   try {
-    db.prepare(`INSERT INTO profiles (user_id, details, completed_at, updated_at) VALUES (?, ?, ?, ?)
-      ON CONFLICT(user_id) DO UPDATE SET details = excluded.details, updated_at = excluded.updated_at`).run(user.id, JSON.stringify(profile), now, now);
+    db.prepare(`INSERT INTO profiles (user_id, details, completed_at, updated_at, start_day) VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(user_id) DO UPDATE SET details = excluded.details, updated_at = excluded.updated_at`).run(user.id, JSON.stringify(profile), now, now, startDay);
     db.prepare(`INSERT INTO plans (user_id, details, updated_at) VALUES (?, ?, ?)
       ON CONFLICT(user_id) DO UPDATE SET details = excluded.details, updated_at = excluded.updated_at`).run(user.id, JSON.stringify(plan), now);
     db.exec('COMMIT');
   } catch (error) { db.exec('ROLLBACK'); throw error; }
-  return { profile: getProfile(user.id), plan: getPlan(user.id) };
+  return { profile: getProfile(user.id), plan: getPlan(user.id), startedOn: getStartDay(user.id) };
+}
+
+export function listReviews(authorization) {
+  const user = currentUser(authorization);
+  return db.prepare('SELECT kind, start_day AS startDay, end_day AS endDay, details, generated_at AS generatedAt FROM reviews WHERE user_id = ? ORDER BY end_day DESC, kind').all(user.id)
+    .map((row) => ({ kind: row.kind, startDay: row.startDay, endDay: row.endDay, ...JSON.parse(row.details), generatedAt: row.generatedAt }));
+}
+
+export function saveReview(authorization, review) {
+  const user = currentUser(authorization);
+  db.prepare('INSERT OR IGNORE INTO reviews (user_id, kind, start_day, end_day, details, generated_at) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(user.id, review.kind, review.startDay, review.endDay, JSON.stringify(review.details), new Date().toISOString());
+  return listReviews(authorization).find((item) => item.kind === review.kind && item.startDay === review.startDay);
 }
 
 export function savePlan(authorization, plan) {
@@ -176,6 +206,21 @@ export function savePlan(authorization, plan) {
   db.prepare(`INSERT INTO plans (user_id, details, updated_at) VALUES (?, ?, ?)
     ON CONFLICT(user_id) DO UPDATE SET details = excluded.details, updated_at = excluded.updated_at`).run(user.id, JSON.stringify(plan), new Date().toISOString());
   return { plan: getPlan(user.id) };
+}
+
+export function saveRecomputedProfile(authorization, profile, plan) {
+  const user = currentUser(authorization);
+  validateProfile(profile);
+  if (!plan || !Array.isArray(plan.days) || plan.days.length !== 7) fail('Invalid generated plan.');
+  const now = new Date().toISOString();
+  db.exec('BEGIN');
+  try {
+    db.prepare('UPDATE profiles SET details = ?, updated_at = ? WHERE user_id = ?').run(JSON.stringify(profile), now, user.id);
+    db.prepare(`INSERT INTO plans (user_id, details, updated_at) VALUES (?, ?, ?)
+      ON CONFLICT(user_id) DO UPDATE SET details = excluded.details, updated_at = excluded.updated_at`).run(user.id, JSON.stringify(plan), now);
+    db.exec('COMMIT');
+  } catch (error) { db.exec('ROLLBACK'); throw error; }
+  return { profile: getProfile(user.id), plan: getPlan(user.id) };
 }
 
 export function logout(authorization) {

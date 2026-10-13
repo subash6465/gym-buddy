@@ -1,13 +1,17 @@
 import * as SecureStore from 'expo-secure-store';
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
 import type { Profile } from './store';
 import type { MealEstimate } from './mealEstimate';
 import type { AiPlan } from './plan';
 import { apiUrl } from './apiUrl';
+import { localDay } from './dates';
+import type { Review, ReviewJob } from './reviews';
 
 export type AiProvider = 'openai' | 'claude' | 'gemini';
-type Account = { user: { id: string; email: string }; profile: Profile | null; ai: { provider: AiProvider | null; configured: boolean }; plan: AiPlan | null };
+export type ChatAction = { kind: 'water' | 'steps' | 'weight'; mode: 'set' | 'add'; date: string; value: number };
+export type ChatReply = { reply: string; action: ChatAction | null; planPreview?: { plan: AiPlan; prior: AiPlan | null; ticket: string } | null };
+type Account = { user: { id: string; email: string }; profile: Profile | null; startedOn: string | null; ai: { provider: AiProvider | null; configured: boolean }; plan: AiPlan | null };
 type Auth = Account & {
   ready: boolean;
   verifyAiKey: (provider: AiProvider, apiKey: string) => Promise<string>;
@@ -15,11 +19,15 @@ type Auth = Account & {
   saveAiConfig: (provider: AiProvider, apiKey: string, verificationTicket: string) => Promise<void>;
   estimateMeal: (description: string, imageDataUrl: string | null) => Promise<MealEstimate>;
   completeOnboarding: (profile: Profile) => Promise<void>;
-  revisePlan: (messages: { role: 'user' | 'assistant'; content: string }[]) => Promise<void>;
-  saveProfile: (profile: Profile) => Promise<void>;
+  revisePlan: (messages: { role: 'user' | 'assistant'; content: string }[], weightKg?: number) => Promise<void>;
+  approvePlan: (ticket: string) => Promise<void>;
+  recomputeProfile: (profile: Profile) => Promise<void>;
   signOut: () => Promise<void>;
   deleteAccount: (clearLocalData: () => Promise<void>) => Promise<void>;
-  chat: (messages: { role: 'user' | 'assistant'; content: string }[], context: string) => Promise<string>;
+  chat: (messages: { role: 'user' | 'assistant'; content: string }[], context: string, weightKg?: number) => Promise<ChatReply>;
+  reviews: Review[];
+  refreshReviews: () => Promise<Review[]>;
+  generateReview: (job: ReviewJob) => Promise<Review>;
 };
 const Context = createContext<Auth | null>(null);
 const sessionKey = 'gym-buddy-session';
@@ -35,7 +43,7 @@ async function request<T>(path: string, method: string, token?: string, body?: o
   let response: Response;
   const base = apiUrl();
   const controller = new AbortController();
-  const timeoutMs = ['/chat', '/estimate-meal', '/verify-ai-key', '/onboarding', '/plan/revise'].includes(path) ? 90_000 : 8000;
+  const timeoutMs = ['/chat', '/estimate-meal', '/verify-ai-key', '/onboarding', '/plan/revise', '/profile/recompute', '/reviews'].includes(path) && method !== 'GET' ? 90_000 : 8000;
   let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
     response = await Promise.race<Response>([fetch(`${base}${path}`, {
@@ -53,11 +61,11 @@ async function request<T>(path: string, method: string, token?: string, body?: o
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const emptyAccount: Account = { user: { id: '', email: '' }, profile: null, ai: { provider: null, configured: false }, plan: null };
+  const emptyAccount: Account = { user: { id: '', email: '' }, profile: null, startedOn: null, ai: { provider: null, configured: false }, plan: null };
   const [account, setAccount] = useState<Account>(emptyAccount);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [token, setToken] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
-  const saveQueue = useRef<Promise<void>>(Promise.resolve());
   useEffect(() => {
     let active = true;
     readToken().then(async (saved) => {
@@ -82,7 +90,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const result = await request<Account & { token: string }>(create ? '/auth/register' : '/auth/login', 'POST', undefined, { email, password, provider, apiKey, verificationTicket });
       await writeToken(result.token);
       setToken(result.token);
-      setAccount({ user: result.user, profile: result.profile, ai: result.ai, plan: result.plan });
+      setAccount({ user: result.user, profile: result.profile, startedOn: result.startedOn, ai: result.ai, plan: result.plan });
+      setReviews([]);
     },
     saveAiConfig: async (provider, apiKey, verificationTicket) => {
       if (!token) throw new Error('Sign in again to continue.');
@@ -95,47 +104,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     },
     completeOnboarding: async (profile) => {
       if (!token) throw new Error('Sign in again to continue.');
-      const result = await request<{ profile: Profile; plan: AiPlan }>('/onboarding', 'POST', token, profile);
-      setAccount((old) => ({ ...old, profile: result.profile, plan: result.plan }));
+      const result = await request<{ profile: Profile; plan: AiPlan; startedOn: string }>('/onboarding', 'POST', token, { ...profile, startDay: localDay() });
+      setAccount((old) => ({ ...old, profile: result.profile, plan: result.plan, startedOn: result.startedOn }));
     },
-    revisePlan: async (messages) => {
+    revisePlan: async (messages, weightKg) => {
       if (!token) throw new Error('Sign in again to continue.');
-      const result = await request<{ plan: AiPlan }>('/plan/revise', 'POST', token, { messages });
+      const result = await request<{ plan: AiPlan }>('/plan/revise', 'POST', token, { messages, weightKg });
       setAccount((old) => ({ ...old, plan: result.plan }));
     },
-    saveProfile: (profile) => {
-      if (!token) return Promise.reject(new Error('Sign in again to continue.'));
-      const currentUserId = account.user.id;
-      const next = saveQueue.current.catch(() => {}).then(async () => {
-        const result = await request<{ profile: Profile }>('/profile', 'PUT', token, profile);
-        setAccount((old) => old.user.id === currentUserId ? { ...old, profile: result.profile } : old);
-      });
-      saveQueue.current = next;
-      return next;
+    approvePlan: async (ticket) => {
+      if (!token) throw new Error('Sign in again to continue.');
+      const result = await request<{ plan: AiPlan }>('/plan/approve', 'POST', token, { ticket });
+      setAccount((old) => ({ ...old, plan: result.plan }));
+    },
+    recomputeProfile: async (profile) => {
+      if (!token) throw new Error('Sign in again to continue.');
+      const result = await request<{ profile: Profile; plan: AiPlan }>('/profile/recompute', 'POST', token, profile);
+      setAccount((old) => ({ ...old, profile: result.profile, plan: result.plan }));
     },
     signOut: async () => {
       if (token) await request('/auth/logout', 'POST', token).catch(() => {});
       await writeToken(null);
       setToken(null);
       setAccount(emptyAccount);
+      setReviews([]);
     },
     deleteAccount: async (clearLocalData) => {
       if (!token) throw new Error('Sign in again to continue.');
-      await saveQueue.current.catch(() => {});
       await request('/account', 'DELETE', token);
       try { await clearLocalData(); }
       finally {
         await writeToken(null).catch(() => {});
         setToken(null);
         setAccount(emptyAccount);
+        setReviews([]);
       }
     },
-    chat: async (messages, context) => {
+    chat: async (messages, context, weightKg) => {
       if (!token) throw new Error('Sign in again to continue.');
-      const result = await request<{ reply: string }>('/chat', 'POST', token, { messages, context });
-      return result.reply;
+      return request<ChatReply>('/chat', 'POST', token, { messages, context, weightKg });
     },
-  }), [account, ready, token]);
+    reviews,
+    refreshReviews: async () => {
+      if (!token) throw new Error('Sign in again to continue.');
+      const result = await request<{ reviews: Review[] }>('/reviews', 'GET', token);
+      setReviews(result.reviews);
+      return result.reviews;
+    },
+    generateReview: async (job) => {
+      if (!token) throw new Error('Sign in again to continue.');
+      const result = await request<{ review: Review }>('/reviews', 'POST', token, job);
+      setReviews((old) => old.some((item) => item.kind === result.review.kind && item.startDay === result.review.startDay) ? old : [result.review, ...old].sort((a, b) => b.endDay.localeCompare(a.endDay)));
+      return result.review;
+    },
+  }), [account, ready, token, reviews]);
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 

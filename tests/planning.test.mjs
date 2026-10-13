@@ -57,7 +57,9 @@ test('plan generation sends all relevant onboarding choices to the selected prov
 test('Gemini plan generation falls back to JSON mode when its strict schema is rejected', async () => {
   const original = globalThis.fetch;
   const requests = [];
-  globalThis.fetch = async (_url, options) => {
+  const urls = [];
+  globalThis.fetch = async (url, options) => {
+    urls.push(url);
     requests.push(JSON.parse(options.body));
     return requests.length === 1 ? { ok: false, status: 400 } : {
       ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(raw) }] } }] }),
@@ -66,9 +68,27 @@ test('Gemini plan generation falls back to JSON mode when its strict schema is r
   try {
     const plan = await createPlan(profile, { provider: 'gemini', apiKey: 'private-test-key' });
     assert.equal(plan.days.length, 7);
+    assert.ok(urls.every((url) => /models\/gemini-3\.8-flash:generateContent$/.test(url)));
     assert.ok(requests[0].generationConfig.responseFormat.text.schema);
     assert.equal(requests[1].generationConfig.responseMimeType, 'application/json');
     assert.equal(requests[1].generationConfig.responseFormat, undefined);
     assert.match(requests[1].systemInstruction.parts[0].text, /recommendedDays/);
+  } finally { globalThis.fetch = original; }
+});
+
+test('chat revision uses the approved plan instead of the original submitted schedule', async () => {
+  const original = globalThis.fetch;
+  let request;
+  globalThis.fetch = async (_url, options) => {
+    request = JSON.parse(options.body);
+    return { ok: true, json: async () => ({ output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(raw) }] }] }) };
+  };
+  try {
+    const previousPlan = normalizePlan(raw, profile);
+    await createPlan({ ...profile, fitnessPlan: 'An obsolete schedule' }, { provider: 'openai', apiKey: 'private-test-key' },
+      [{ role: 'user', content: 'Move training to Tuesday' }], previousPlan);
+    const sent = JSON.parse(request.input.at(-1).content);
+    assert.equal(sent.profile.suppliedWorkoutPlan, '');
+    assert.equal(sent.previousPlan.summary, previousPlan.summary);
   } finally { globalThis.fetch = original; }
 });

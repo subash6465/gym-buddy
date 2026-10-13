@@ -19,3 +19,17 @@ test('provider errors do not issue verification tickets', async () => {
   try { await assert.rejects(verifyAiKey('openai', 'sample-private-key'), { status: 502 }); }
   finally { globalThis.fetch = original; }
 });
+
+test('Gemini key verification calls Gemma 4 26B', async () => {
+  const original = globalThis.fetch;
+  let url;
+  globalThis.fetch = async (requestUrl) => {
+    url = requestUrl;
+    return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: 'OK' }] } }] }) };
+  };
+  try {
+    const { ticket } = await verifyAiKey('gemini', 'sample-private-key');
+    assert.match(url, /models\/gemma-4-26b-a4b-it:generateContent$/);
+    assert.doesNotThrow(() => requireVerifiedKey('gemini', 'sample-private-key', ticket));
+  } finally { globalThis.fetch = original; }
+});

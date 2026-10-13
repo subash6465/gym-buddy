@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 process.env.DATABASE_PATH = ':memory:';
-const { register, login, getAccount, getAiConfig, saveAiConfig, saveOnboarding, saveProfile, logout, deleteAccount } = await import('../server/accounts.mjs');
+const { register, login, getAccount, getAiConfig, saveAiConfig, saveOnboarding, saveProfile, saveRecomputedProfile, saveReview, listReviews, logout, deleteAccount } = await import('../server/accounts.mjs');
 
 test('account setup persists profile and sessions are isolated', () => {
   const first = register(' First@Example.com ', 'a-long-password');
@@ -61,4 +61,28 @@ test('onboarding saves profile and weekly plan to the same account', () => {
   saveOnboarding(`Bearer ${account.token}`, profile, plan);
   assert.deepEqual(getAccount(`Bearer ${account.token}`).plan, plan);
   assert.deepEqual(login('plan@example.com', 'a-long-password').plan, plan);
+});
+
+test('profile recomputation saves profile and plan together; reviews are immutable and account scoped', () => {
+  const account = register('reviews@example.com', 'a-long-password');
+  const other = register('other-reviews@example.com', 'a-long-password');
+  const authorization = `Bearer ${account.token}`;
+  const profile = { name: 'River', dob: '1992-03-03', heightCm: '175', weightKg: 75,
+    goal: 'maintain', setting: 'home', activity: 'light', equation: 'male', nutritionCaution: false,
+    allergies: '', concerns: '', fitnessPlan: '', daysPerWeek: 3, pace: 'moderate' };
+  const plan = { days: Array.from({ length: 7 }, (_, index) => ({ day: index, title: 'Walk' })) };
+  saveOnboarding(authorization, profile, plan, '2026-09-01');
+  assert.equal(getAccount(authorization).startedOn, '2026-09-01');
+  assert.throws(() => saveRecomputedProfile(authorization, { ...profile, heightCm: '20' }, plan), { status: 400 });
+  assert.deepEqual(getAccount(authorization).profile, profile);
+  const next = { ...profile, goal: 'gain' };
+  const nextPlan = { days: plan.days.map((day) => ({ ...day, title: 'Strength' })) };
+  saveRecomputedProfile(authorization, next, nextPlan);
+  assert.deepEqual(getAccount(authorization).profile, next);
+  assert.deepEqual(getAccount(authorization).plan, nextPlan);
+  const first = saveReview(authorization, { kind: 'weekly', startDay: '2026-09-01', endDay: '2026-09-07', details: { summary: 'Original review', wins: [], improvements: [], nextSteps: [] } });
+  const second = saveReview(authorization, { kind: 'weekly', startDay: '2026-09-01', endDay: '2026-09-07', details: { summary: 'Replacement', wins: [], improvements: [], nextSteps: [] } });
+  assert.equal(first.summary, second.summary);
+  assert.equal(listReviews(authorization).length, 1);
+  assert.equal(listReviews(`Bearer ${other.token}`).length, 0);
 });
