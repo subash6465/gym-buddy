@@ -1,35 +1,11 @@
-import { StatusBar } from 'expo-status-bar';
-import { Platform, StyleSheet } from 'react-native';
+import { router } from 'expo-router';
+import { Text } from 'react-native';
+import { Button, Card, Page, Title, ui } from '@/components/UI';
 
-import EditScreenInfo from '@/components/EditScreenInfo';
-import { Text, View } from '@/components/Themed';
-
-export default function ModalScreen() {
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Modal</Text>
-      <View style={styles.separator} lightColor="#eee" darkColor="rgba(255,255,255,0.1)" />
-      <EditScreenInfo path="app/modal.tsx" />
-
-      {/* Use a light status bar on iOS to account for the black space above the modal */}
-      <StatusBar style={Platform.OS === 'ios' ? 'light' : 'auto'} />
-    </View>
-  );
+export default function AboutScreen() {
+  return <Page>
+    <Title eyebrow="YOUR DAILY EDGE" subtitle="Training, nutrition, and progress. Together.">Meet Gym Buddy.</Title>
+    <Card><Text style={ui.muted}>Build a personal training week, keep track of daily check-ins, and turn your effort into a clearer picture of progress.</Text><Text style={ui.muted}>Your AI coach can help you explore your goals. Review its nutrition estimates and approve proposed plan changes before saving.</Text></Card>
+    <Button onPress={() => router.replace('/(tabs)')}>Back to today</Button>
+  </Page>;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  separator: {
-    marginVertical: 30,
-    height: 1,
-    width: '80%',
-  },
-});

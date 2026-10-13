@@ -1,5 +1,6 @@
 import type { Profile } from './store';
 import type { AiPlan } from './plan';
+import { nutritionRestrictions } from '../shared/nutrition-profile.mjs';
 
 export function ageOnDate(dob: string, now = new Date()): number | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dob);
@@ -13,7 +14,7 @@ export function ageOnDate(dob: string, now = new Date()): number | null {
 export function suggestedTargets(profile: Profile, weightKg?: number, now = new Date()) {
   const age = ageOnDate(profile.dob, now);
   const height = Number(profile.heightCm);
-  if (age === null || age < 20 || !weightKg || weightKg <= 0 || height < 100 || height > 250 || !profile.equation || profile.nutritionCaution) return null;
+  if (age === null || age < 20 || !weightKg || weightKg <= 0 || !Number.isFinite(height) || height < 100 || height > 250 || !profile.equation || nutritionRestrictions(profile).requiresClinician) return null;
   const bmi = weightKg / ((height / 100) ** 2);
   if (profile.goal === 'lose' && bmi < 18.5) return null;
   const resting = 10 * weightKg + 6.25 * height - 5 * age + (profile.equation === 'male' ? 5 : -161);
@@ -30,6 +31,12 @@ export function suggestedTargets(profile: Profile, weightKg?: number, now = new 
 
 export function planTargets(profile: Profile, weightKg: number | undefined, plan: AiPlan | null, now = new Date()) {
   const base = suggestedTargets(profile, weightKg, now);
+  if (!base && plan?.nutrition?.calorieSource === 'clinician' && plan.calorieTarget > 0) return {
+    age: ageOnDate(profile.dob, now) ?? 0, bmi: 0, resting: 0, maintenance: 0, proteinFactor: 0,
+    calories: plan.calorieTarget, protein: plan.proteinGrams, water: plan.waterMl, steps: plan.stepsTarget, deficit: 0,
+  };
+  if (nutritionRestrictions(profile).requiresClinician && plan?.nutrition?.calorieSource !== 'clinician') return null;
+  if (plan?.nutrition && plan.nutrition.calorieSource === 'none') return null;
   if (!base || !plan || !plan.calorieTarget) return base;
   return { ...base, calories: plan.calorieTarget, maintenance: plan.maintenanceCalories,
     protein: plan.proteinGrams, water: plan.waterMl, steps: plan.stepsTarget, deficit: plan.deficitCalories };

@@ -5,7 +5,7 @@ import { createPlan, normalizePlan } from '../server/planning.mjs';
 const profile = { name: 'Alex', dob: '1990-01-01', heightCm: '175', weightKg: 80,
   goal: 'lose', setting: 'gym', activity: 'moderate', equation: 'male', nutritionCaution: false,
   allergies: '', concerns: '', fitnessPlan: '', daysPerWeek: 7, pace: 'aggressive' };
-const raw = { summary: 'Strength and walking', suggestions: 'Allow recovery.', recommendedDays: 7,
+const raw = { nutrition: { carbsGrams: 270, fatGrams: 70, fibreGrams: 30, addedSugarLimitGrams: 25, saturatedFatLimitGrams: 10, requiresClinicianReview: false, rationale: 'Fits the training goal.' }, summary: 'Strength and walking', suggestions: 'Allow recovery.', recommendedDays: 7,
   calorieTarget: 500, waterMl: 9000, stepsTarget: 50000, proteinGrams: 500,
   days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => ({ day, title: `${day} gym`, focus: 'Full body', activities: ['Squat', 'Row'], minutes: 60, isRest: false })) };
 

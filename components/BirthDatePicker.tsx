@@ -1,1 +1,1 @@
-export { default } from './BirthDatePicker.native';
+export { default } from './BirthDateField';

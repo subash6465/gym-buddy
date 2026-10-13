@@ -1,24 +1,29 @@
+import NutritionStatus from '@/components/NutritionStatus';
+import MacroBreakdown from '@/components/MacroBreakdown';
+import { macroTotals } from '@/lib/macros';
+import { formatDate } from '@/lib/dates';
 import { router } from 'expo-router';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Card, Icon, Meter, MotionPressable, Orbit, Page, Row, Title, ui } from '@/components/UI';
 import { Meal, today, useStore } from '@/lib/store';
 import { useClock } from '@/lib/clock';
 import { planTargets } from '@/lib/targets';
 import { useAuth } from '@/lib/auth';
 import { theme } from '@/lib/theme';
-import ProgressChart from '@/components/ProgressChart';
 
-const sum = (items: Meal[], key: 'calories' | 'protein' | 'carbs' | 'fat' | 'fibre' | 'sugar') =>
-  items.reduce((total, item) => total + (Number(item[key]) || 0), 0);
+const sum = (items: Meal[], key: 'calories' | 'protein' | 'carbs' | 'fat' | 'fibre' | 'sugar') => items.reduce((total, item) => total + (Number(item[key]) || 0), 0);
+const log = (mode: string) => router.push({ pathname: '/(tabs)/log', params: { mode, entry: String(Date.now()) } });
 
-function Metric({ icon, label, value, guide, fraction, color }: {
-  icon: 'protein' | 'water'; label: string; value: string; guide: string; fraction: number; color: string;
+function Metric({ icon, label, value, guide, fraction, color, onPress }: {
+  icon: 'protein' | 'water' | 'steps' | 'workout'; label: string; value: string; guide: string; fraction: number; color: string; onPress: () => void;
 }) {
-  return <Card style={{ flex: 1, minWidth: 138, padding: 15 }}>
-    <Row><Icon name={icon} color={color} size={17} /><Text style={{ color: theme.muted, fontSize: 12, fontWeight: '700' }}>{label}</Text></Row>
-    <Text style={{ color: theme.text, fontSize: 24, fontWeight: '800', letterSpacing: -1 }}>{value}<Text style={{ color: theme.muted, fontSize: 12, fontWeight: '600' }}> {guide}</Text></Text>
-    <Meter value={fraction} max={1} color={color} />
-  </Card>;
+  return <Pressable accessibilityRole="button" accessibilityLabel={`${label}: ${value}. ${guide}. Tap to log.`} onPress={onPress} style={{ width: '47%', flexGrow: 1 }}>
+    <Card style={{ padding: 16, gap: 12 }}><Row><View style={{ width: 30, height: 30, borderRadius: 10, backgroundColor: `${color}18`, alignItems: 'center', justifyContent: 'center' }}><Icon name={icon} color={color} size={17} /></View><Text style={{ color: theme.muted, fontSize: 12, fontWeight: '600', flex: 1 }}>{label}</Text><Text style={{ color: theme.muted }}>+</Text></Row>
+      <Text style={{ color: theme.text, fontSize: 27, fontFamily: theme.font, letterSpacing: -1 }}>{value}</Text>
+      <Meter value={fraction} max={1} color={color} /><Text style={{ color: theme.muted, fontSize: 11 }}>{guide}</Text>
+    </Card>
+  </Pressable>;
 }
 
 export default function Today() {
@@ -31,83 +36,55 @@ export default function Today() {
   const calories = sum(meals, 'calories');
   const protein = sum(meals, 'protein');
   const water = store.water[date] || 0;
-  const steps = store.stepEntries.filter((item) => item.date === date).reduce((total, item) => total + item.count, 0);
-  const trainingMinutes = workouts.reduce((total, item) => total + item.minutes, 0);
+  const steps = store.stepEntries.filter((entry) => entry.date === date).reduce((total, entry) => total + entry.count, 0);
+  const minutes = workouts.reduce((total, item) => total + item.minutes, 0);
   const targets = planTargets(store.profile, store.weighIns[0]?.kg, auth.plan, now);
   const todayPlan = auth.plan?.days[(now.getDay() + 6) % 7];
   const firstName = store.profile.name.trim().split(' ')[0];
   const recent = [
-    ...meals.map((item) => ({ id: item.id, title: item.name, detail: `${Math.round(item.calories)} kcal · ${Math.round(item.protein)} g protein`, icon: 'meal' as const, kind: 'MEAL' })),
-    ...workouts.map((item) => ({ id: item.id, title: item.name, detail: `${item.minutes} min`, icon: 'workout' as const, kind: 'WORKOUT' })),
-  ].slice(0, 4);
+    ...meals.map((item) => ({ id: item.id, time: item.time, title: item.name, detail: `${Math.round(item.calories)} kcal`, icon: 'meal' as const, color: theme.nutrition })),
+    ...workouts.map((item) => ({ id: item.id, time: item.time, title: item.name, detail: `${item.minutes} min training`, icon: 'workout' as const, color: theme.accent })),
+  ].sort((a, b) => (b.time || '').localeCompare(a.time || '')).slice(0, 3);
 
+  const proteinGuide = auth.plan?.nutrition ? auth.plan.proteinGrams : targets?.protein;
+  const waterGuide = auth.plan?.nutrition ? auth.plan.waterMl : targets?.water;
   return <Page>
-    <Title eyebrow={now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
-      subtitle={firstName ? `Ready when you are, ${firstName}.` : 'A clear view of what you have done today.'}>
-      Own your momentum.
-    </Title>
-
-    <MotionPressable onPress={() => router.push('/chat')} style={{ width: '100%', minHeight: 72, borderRadius: 20, backgroundColor: theme.accent }}>
-      <Row><Icon name="chat" color={theme.ink} size={26} /><View><Text style={{ color: theme.ink, fontSize: 18, fontWeight: '800' }}>Ask Gym Buddy AI</Text><Text style={{ color: theme.ink, fontSize: 11 }}>Chat about your plan, meals, and progress</Text></View></Row>
-    </MotionPressable>
-
-    <Card style={{ backgroundColor: 'rgba(45,104,106,0.28)', borderColor: 'rgba(118,240,219,0.3)' }}>
-      <Row><Text style={{ color: theme.text, fontSize: 11, fontWeight: '800', letterSpacing: 1.2, flex: 1 }}>TODAY’S ENERGY</Text>
-        <Text style={{ color: theme.accent, fontSize: 10, fontWeight: '800' }}>{targets ? 'DAILY GUIDE' : 'SET YOUR GUIDE'}</Text></Row>
-      <Row>
-        <Orbit value={calories} max={targets?.calories || 0} />
-        <View style={{ flex: 1, gap: 5 }}>
-          <Text style={ui.muted}>Consumed</Text>
-          <Text style={{ color: theme.text, fontSize: 29, fontWeight: '800', letterSpacing: -1.2 }}>{Math.round(calories).toLocaleString()}</Text>
-          <Text style={{ color: theme.accent, fontSize: 12, fontWeight: '800' }}>kcal today</Text>
-          <Text style={[ui.muted, { marginTop: 5, fontSize: 11, lineHeight: 17 }]}>
-            {targets ? `${Math.max(0, targets.calories - Math.round(calories)).toLocaleString()} kcal until your ${targets.calories.toLocaleString()} kcal guide` : 'Add your details and a current weight in You to see an estimated guide.'}
-          </Text>
-        </View>
-      </Row>
-      <View style={{ borderTopWidth: 1, borderColor: theme.line, paddingTop: 12 }}>
-        <Text style={ui.muted}>{meals.length} meal{meals.length === 1 ? '' : 's'} logged · {workouts.length} workout{workouts.length === 1 ? '' : 's'} completed today</Text>
-      </View>
+    <Title eyebrow={`${now.toLocaleDateString(undefined, { weekday: 'long' })} / ${formatDate(now)}`} subtitle="Small steps. Stronger every day.">{firstName ? `Let's move, ${firstName}.` : 'Make today count.'}</Title>
+    <Card style={{ backgroundColor: theme.hero, borderColor: theme.heroLine, padding: 22 }}>
+      <LinearGradient pointerEvents="none" colors={[theme.heroGlow, 'transparent']} start={{ x: 1, y: 0 }} end={{ x: 0, y: 1 }} style={StyleSheet.absoluteFill} />
+      <Row><Text style={[ui.eyebrow, { flex: 1 }]}>TODAY’S FOCUS</Text><View style={s.pill}><Text style={s.pillText}>{todayPlan?.isRest ? 'RECOVERY' : 'TRAINING'}</Text></View></Row>
+      <Row><View style={{ flex: 1, gap: 8 }}><Text style={s.workoutTitle}>{todayPlan?.title || 'Find your next move'}</Text><Text style={ui.muted}>{todayPlan ? `${todayPlan.minutes} min · ${todayPlan.focus}` : 'A personal plan, built around you.'}</Text></View><View style={s.workoutIcon}><Icon name="workout" color={theme.accent} size={34} /></View></Row>
+      <MotionPressable onPress={() => router.push('/(tabs)/plan')} style={s.primary}><Row><Text style={s.primaryText}>{todayPlan ? 'View today’s session' : 'Explore your plan'}</Text><Icon name="arrow" color={theme.ink} size={18} /></Row></MotionPressable>
     </Card>
 
-    <Row>
-      <Metric icon="protein" label="Protein" value={`${Math.round(protein)} g`} guide={targets ? `/ ${targets.protein} g` : '/ —'} fraction={targets ? protein / targets.protein : 0} color={theme.orange} />
-      <Metric icon="water" label="Water" value={`${(water / 1000).toFixed(2).replace(/0$/, '')} L`} guide={targets ? `/ ${(targets.water / 1000).toFixed(1)} L` : '/ —'} fraction={targets ? water / targets.water : 0} color={theme.blue} />
-    </Row>
-    <MotionPressable onPress={() => store.addWater(date, 250)}
-      style={{ alignSelf: 'flex-end', paddingVertical: 7, paddingHorizontal: 10 }}>
-      <Text style={{ color: theme.accent, fontSize: 12, fontWeight: '800' }}>+ Add 250 ml water</Text>
-    </MotionPressable>
+    <View style={{ gap: 12 }}><Row><Text style={s.section}>Quick check-in</Text><Text style={[ui.muted, { fontSize: 11 }]}>MAKE IT A HABIT</Text></Row>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{([{ mode: 'meal', label: 'Meal', icon: 'meal', color: theme.nutrition }, { mode: 'workout', label: 'Workout', icon: 'workout', color: theme.accent }, { mode: 'water', label: 'Water', icon: 'water', color: theme.hydration }, { mode: 'weight', label: 'Weight', icon: 'weight', color: theme.secondary }, { mode: 'steps', label: 'Steps', icon: 'steps', color: theme.accent }] as const).map((item) => <MotionPressable key={item.mode} onPress={() => log(item.mode)} style={{ flex: 1, minWidth: 48, minHeight: 78, borderRadius: 18, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.line }}><Icon name={item.icon} color={item.color} size={22} /><Text style={{ color: theme.text, fontSize: 11, fontWeight: '700', marginTop: 9 }}>{item.label}</Text></MotionPressable>)}</View>
+    </View>
 
-    <Row><Card style={{ flex: 1, padding: 15 }}><Text style={ui.muted}>Steps today</Text><Text style={{ color: theme.text, fontSize: 23, fontWeight: '800' }}>{steps.toLocaleString()}</Text></Card><Card style={{ flex: 1, padding: 15 }}><Text style={ui.muted}>Training today</Text><Text style={{ color: theme.text, fontSize: 23, fontWeight: '800' }}>{trainingMinutes} <Text style={{ fontSize: 12, color: theme.muted }}>min</Text></Text></Card></Row>
+    <Row><Text style={s.section}>Daily balance</Text><Text style={[ui.muted, { fontSize: 11 }]}>{meals.length} meals logged</Text></Row>
+    <Card><Row><View style={{ flex: 1, gap: 5 }}><Text style={ui.label}>ENERGY INTAKE</Text><Text style={{ color: theme.text, fontSize: 34, fontFamily: theme.font, letterSpacing: -2 }}>{Math.round(calories).toLocaleString()}</Text><Text style={{ color: theme.muted, fontSize: 12 }}>kcal{targets ? ` / ${targets.calories.toLocaleString()} guide` : ' today'}</Text><Text style={{ color: theme.accent, fontSize: 12, lineHeight: 18, marginTop: 6 }}>{targets ? calories > targets.calories ? `${Math.round(calories - targets.calories).toLocaleString()} kcal above guide` : `${Math.round(targets.calories - calories).toLocaleString()} kcal to guide` : 'Personal guide not set'}</Text></View><Orbit size={112} value={calories} max={targets?.calories || 0} /></Row><Text style={[ui.muted, { fontSize: 11 }]}>An intake guide, not a measured energy deficit.</Text></Card>
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+      <Metric icon="protein" label="Protein" value={`${Math.round(protein)} g`} guide={proteinGuide ? `of ${proteinGuide} g guide` : 'No personal guide'} fraction={proteinGuide ? protein / proteinGuide : 0} color={theme.nutrition} onPress={() => log('meal')} />
+      <Metric icon="water" label="Hydration" value={`${(water / 1000).toFixed(1)} L`} guide={waterGuide ? `of ${(waterGuide / 1000).toFixed(1)} L drinks guide` : 'No personal guide'} fraction={waterGuide ? water / waterGuide : 0} color={theme.hydration} onPress={() => log('water')} />
+      <Metric icon="steps" label="Steps" value={steps.toLocaleString()} guide={auth.plan?.stepsTarget ? `of ${auth.plan.stepsTarget.toLocaleString()} daily guide` : 'Manually logged'} fraction={auth.plan?.stepsTarget ? steps / auth.plan.stepsTarget : 0} color={theme.secondary} onPress={() => log('steps')} />
+      <Metric icon="workout" label="Training" value={`${minutes} min`} guide={`${workouts.length} sessions logged today`} fraction={todayPlan?.minutes ? minutes / todayPlan.minutes : 0} color={theme.accent} onPress={() => log('workout')} />
+    </View>
+    <MotionPressable onPress={() => store.addWater(date, 250)} style={{ minHeight: 44, borderRadius: 14, borderWidth: 1, borderColor: theme.line }}><Row><Icon name="water" color={theme.hydration} size={17} /><Text style={{ color: theme.hydration, fontSize: 13, fontWeight: '700' }}>Quick add · 250 ml water</Text></Row></MotionPressable>
 
-    <ProgressChart logs={store} today={date} />
-    <MotionPressable onPress={() => router.push('/reviews')} style={{ width: '100%', padding: 16, borderRadius: 18, backgroundColor: theme.cardAlt, borderWidth: 1, borderColor: theme.line }}><Row><View style={{ flex: 1 }}><Text style={{ color: theme.text, fontWeight: '800', fontSize: 17 }}>Weekly & monthly reviews</Text><Text style={ui.muted}>AI reflections saved after each completed period</Text></View><Text style={{ color: theme.accent, fontSize: 19 }}>↗</Text></Row></MotionPressable>
-
-    <Row><Text style={{ color: theme.text, fontSize: 19, fontWeight: '800', flex: 1 }}>Your next move</Text>
-      <Pressable onPress={() => router.push('/(tabs)/plan')} accessibilityRole="button"><Text style={{ color: theme.accent, fontWeight: '800', fontSize: 12 }}>Open plan ↗</Text></Pressable></Row>
-    <MotionPressable onPress={() => router.push('/(tabs)/plan')} style={{ width: '100%' }}>
-      <Card style={{ width: '100%', flexDirection: 'row', alignItems: 'center', gap: 13 }}>
-        <View style={{ width: 46, height: 46, borderRadius: 15, backgroundColor: 'rgba(118,240,219,0.15)', alignItems: 'center', justifyContent: 'center' }}><Icon name="workout" color={theme.accent} size={23} /></View>
-        <View style={{ flex: 1 }}><Text style={{ color: theme.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>{todayPlan ? `${todayPlan.day.toUpperCase()} · ${todayPlan.isRest ? 'RECOVERY' : `${todayPlan.minutes} MIN`}` : 'YOUR WEEKLY PLAN'}</Text>
-          <Text style={{ color: theme.text, fontSize: 16, fontWeight: '800', marginTop: 3 }}>{todayPlan?.title || 'Open your plan'}</Text>
-          <Text style={[ui.muted, { fontSize: 11 }]}>{todayPlan?.activities.join(' · ') || 'See your day-by-day schedule'}</Text></View>
-        <Icon name="arrow" color={theme.text} size={17} />
-      </Card>
-    </MotionPressable>
-
-    <Row><Text style={{ color: theme.text, fontSize: 19, fontWeight: '800', flex: 1 }}>Recent activity</Text>
-      <Pressable onPress={() => router.push('/(tabs)/log')} accessibilityRole="button"><Text style={{ color: theme.accent, fontWeight: '800', fontSize: 12 }}>Add new +</Text></Pressable></Row>
-    {recent.length ? <Card>{recent.map((item) => <Row key={item.id}>
-      <View style={{ width: 34, height: 34, borderRadius: 11, backgroundColor: 'rgba(118,240,219,0.12)', alignItems: 'center', justifyContent: 'center' }}><Icon name={item.icon} color={theme.accent} size={17} /></View>
-      <View style={{ flex: 1 }}><Text style={{ color: theme.text, fontSize: 13, fontWeight: '700' }}>{item.title}</Text><Text style={[ui.muted, { fontSize: 11 }]}>{item.kind} · {item.detail}</Text></View>
-    </Row>)}</Card> : <Card><Text style={ui.muted}>Meals and workouts will appear here after you log them.</Text></Card>}
-
-    {meals.length > 0 && <><Text style={{ color: theme.text, fontSize: 19, fontWeight: '800' }}>Nutrition details</Text>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-        {([['Carbs', 'carbs'], ['Fat', 'fat'], ['Fibre', 'fibre'], ['Sugar', 'sugar']] as const).map(([label, key]) =>
-          <Card key={key} style={{ width: '47%', flexGrow: 1, padding: 15 }}><Text style={ui.muted}>{label}</Text><Text style={{ color: theme.text, fontSize: 22, fontWeight: '800' }}>{Math.round(sum(meals, key))}<Text style={{ fontSize: 12, color: theme.muted }}> g</Text></Text></Card>)}
-      </View>
-    </>}
+    <MotionPressable onPress={() => router.push('/chat')} style={{ width: '100%' }}><Card style={{ width: '100%' }}><Row><View style={s.coachIcon}><Icon name="sparkles" color={theme.secondary} size={23} /></View><View style={{ flex: 1, gap: 4 }}><Text style={{ color: theme.text, fontSize: 17, fontFamily: theme.font }}>A little guidance goes far.</Text><Text style={ui.muted}>Talk meals, training & goals with your AI coach.</Text></View><Icon name="arrow" color={theme.muted} size={17} /></Row></Card></MotionPressable>
+    <Row><Text style={s.section}>Today’s activity</Text><Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/(tabs)/history', params: { view: 'history' } })} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: theme.accent, fontSize: 12, fontWeight: '700' }}>See history ↗</Text></Pressable></Row>
+    <Card>{recent.length ? recent.map((item) => <Row key={item.id}><View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: `${item.color}16`, alignItems: 'center', justifyContent: 'center' }}><Icon name={item.icon} color={item.color} size={18} /></View><View style={{ flex: 1, gap: 3 }}><Text style={{ color: theme.text, fontSize: 14, fontWeight: '700' }}>{item.title}</Text><Text style={[ui.muted, { fontSize: 11 }]}>{item.detail}</Text></View></Row>) : <><Text style={{ color: theme.text, fontSize: 15, fontWeight: '700' }}>A fresh page for today.</Text><Text style={ui.muted}>Your meals and workouts will show up here as you log them. Start with a quick check-in above.</Text></>}</Card>
+    <NutritionStatus />
+    <Card><Text style={s.section}>Macro breakdown</Text><MacroBreakdown amounts={macroTotals(meals)} targets={targets} /></Card>
   </Page>;
 }
+const s = StyleSheet.create({
+  section: { color: theme.text, fontSize: 19, fontFamily: theme.font, letterSpacing: -.5, flex: 1 },
+  workoutTitle: { color: theme.text, fontSize: 28, lineHeight: 33, fontFamily: theme.font, letterSpacing: -1 },
+  pill: { borderRadius: 8, paddingHorizontal: 9, paddingVertical: 6, backgroundColor: theme.accentSoft },
+  pillText: { color: theme.accent, fontSize: 9, fontFamily: theme.font, letterSpacing: .8 },
+  workoutIcon: { width: 70, height: 70, borderRadius: 22, backgroundColor: theme.accentSoft, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '-12deg' }] },
+  primary: { minHeight: 52, borderRadius: 16, backgroundColor: theme.accent, marginTop: 6 },
+  primaryText: { color: theme.ink, fontFamily: theme.font, fontSize: 14 },
+  coachIcon: { width: 44, height: 44, borderRadius: 15, backgroundColor: theme.accentSoft, alignItems: 'center', justifyContent: 'center' },
+});

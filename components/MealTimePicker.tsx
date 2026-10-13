@@ -1,1 +1,1 @@
-export { default } from './MealTimePicker.native';
+export { default } from './TimePickerField';

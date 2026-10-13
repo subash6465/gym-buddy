@@ -1,1 +1,1 @@
-export { default } from './DaySelector.native';
+export { default } from './DaySelectorField';

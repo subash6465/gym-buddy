@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { ageOnDate, suggestedTargets } from '../lib/targets.ts';
+import { ageOnDate, suggestedTargets, planTargets } from '../lib/targets.ts';
 import { withSavedMeal } from '../lib/meals.ts';
 
 test('age changes on the birthday', () => {
@@ -24,4 +24,14 @@ test('main meals are unique each day while snacks can repeat', () => {
   const list = [meal('old', 'breakfast'), meal('other day', 'breakfast', '2026-10-06'), meal('snack 1', 'snack')];
   assert.deepEqual(withSavedMeal(list, meal('new', 'breakfast')).map((entry) => entry.id), ['new', 'other day', 'snack 1']);
   assert.deepEqual(withSavedMeal(list, meal('snack 2', 'snack')).map((entry) => entry.id), ['snack 2', 'old', 'other day', 'snack 1']);
+});
+
+test('clinical profiles cannot fall back to a legacy automated plan', () => {
+  const profile = { dob: '1996-01-01', heightCm: '175', equation: 'male', activity: 'moderate', goal: 'maintain', nutritionCaution: false, healthConditions: ['diabetes'], concerns: '' };
+  const legacy = { calorieTarget: 2000, proteinGrams: 120, waterMl: 2500, stepsTarget: 8000 };
+  assert.equal(planTargets(profile, 80, legacy), null);
+  const clinical = { ...legacy, calorieTarget: 1800, proteinGrams: 45, waterMl: 1200, nutrition: { calorieSource: 'clinician', requiresClinicianReview: true } };
+  assert.equal(planTargets(profile, 80, clinical).calories, 1800);
+  assert.equal(planTargets(profile, 80, clinical).protein, 45);
+  assert.equal(suggestedTargets({ ...profile, healthConditions: [], heightCm: 'invalid' }, 80), null);
 });
