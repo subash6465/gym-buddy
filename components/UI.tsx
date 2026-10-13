@@ -11,6 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BrandMark } from './BrandMark';
 import Svg, { Circle } from 'react-native-svg';
 import { useReduceMotion } from '@/lib/motion';
+import { useStore } from '@/lib/store';
 
 const symbolNames = {
   home: { ios: 'house.fill', android: 'home', web: 'home' },
@@ -51,12 +52,14 @@ export function Brand() {
 
 export function Page({ children }: { children: ReactNode }) {
   const focused = useIsFocused();
+  const { storageSaveError, retrySave } = useStore();
   return <SafeAreaView style={s.safe} edges={['top']}>
     <LinearGradient pointerEvents="none" colors={[theme.glow, 'transparent', theme.nightGlow]} style={StyleSheet.absoluteFill} />
     <KeyboardAvoidingView style={s.page} behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}>
       <PageFocusContext.Provider value={focused}>
         <ScrollView style={s.page} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={false}>
           <Reveal delay={0}><Brand /></Reveal>
+          {storageSaveError ? <View style={{ gap: 8 }}><Text accessibilityRole="alert" style={{ color: theme.red }}>{storageSaveError}</Text><Button onPress={retrySave}>Try saving again</Button></View> : null}
           {Children.toArray(children).map((child, index) =>
             <Reveal key={index} delay={Math.min(index * 24, 120)}>{child}</Reveal>)}
         </ScrollView>

@@ -132,3 +132,10 @@ test('Gemma coach gets a single prompt-based JSON request without unsupported sc
     assert.match(calls[0].systemInstruction.parts[0].text, /Return only a JSON object matching this schema/);
   } finally { globalThis.fetch = original; }
 });
+
+test('malformed provider JSON returns a recoverable provider error', async (t) => {
+  const original = globalThis.fetch;
+  t.after(() => { globalThis.fetch = original; });
+  globalThis.fetch = async () => new Response('not JSON');
+  await assert.rejects(generate({ provider: 'openai', apiKey: 'private-test-key', instructions: 'Reply briefly', messages: [{ role: 'user', content: 'Hello' }] }), { status: 502 });
+});

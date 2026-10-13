@@ -1,10 +1,11 @@
 import * as SecureStore from 'expo-secure-store';
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import type { Profile } from './store';
 import type { MealEstimate } from './mealEstimate';
 import type { AiPlan } from './plan';
 import { apiUrl } from './apiUrl';
+import { apiRequest } from './request';
 import { localDay } from './dates';
 import type { Review, ReviewJob } from './reviews';
 
@@ -40,24 +41,8 @@ const writeToken = (token: string | null) => Platform.OS === 'web'
   : token ? SecureStore.setItemAsync(sessionKey, token) : SecureStore.deleteItemAsync(sessionKey);
 
 async function request<T>(path: string, method: string, token?: string, body?: object): Promise<T> {
-  let response: Response;
-  const base = apiUrl();
-  const controller = new AbortController();
   const timeoutMs = ['/chat', '/estimate-meal', '/verify-ai-key', '/onboarding/preview', '/profile/preview', '/reviews'].includes(path) && method !== 'GET' ? 90_000 : 8000;
-  let timeout: ReturnType<typeof setTimeout> | undefined;
-  try {
-    response = await Promise.race<Response>([fetch(`${base}${path}`, {
-      method, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      ...(body ? { body: JSON.stringify(body) } : {}),
-      signal: controller.signal,
-    }), new Promise<Response>((_, reject) => { timeout = setTimeout(() => { controller.abort(); reject(new Error('timeout')); }, timeoutMs); })]);
-  } catch (error) {
-    if (error instanceof Error && error.message === 'timeout') throw new Error('The Gym Buddy API did not respond in time. Try again.');
-    throw new Error(`Cannot reach the Gym Buddy API at ${base}. Start npm run api on your computer and keep your phone on the same Wi-Fi.`);
-  } finally { if (timeout) clearTimeout(timeout); }
-  const result = await response.json();
-  if (!response.ok) throw Object.assign(new Error(result.error || 'Request failed.'), { status: response.status });
-  return result as T;
+  return apiRequest<T>({ baseUrl: apiUrl(), path, method, token, body, timeoutMs });
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -66,6 +51,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [token, setToken] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const activeUserId = useRef(account.user.id);
+  activeUserId.current = account.user.id;
   useEffect(() => {
     let active = true;
     readToken().then(async (saved) => {
@@ -96,7 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     saveAiConfig: async (provider, apiKey, verificationTicket) => {
       if (!token) throw new Error('Sign in again to continue.');
       const result = await request<{ ai: Account['ai'] }>('/ai-config', 'PUT', token, { provider, apiKey, verificationTicket });
-      setAccount((old) => ({ ...old, ai: result.ai }));
+      setAccount((old) => old.user.id === account.user.id ? { ...old, ai: result.ai } : old);
     },
     estimateMeal: async (description, imageDataUrl) => {
       if (!token) throw new Error('Sign in again to continue.');
@@ -109,13 +96,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     approveAccountPlan: async (ticket, onboarding) => {
       if (!token) throw new Error('Sign in again to continue.');
       const result = await request<{ profile: Profile; plan: AiPlan; startedOn?: string }>(onboarding ? '/onboarding/approve' : '/profile/approve', 'POST', token, { ticket });
-      setAccount((old) => ({ ...old, profile: result.profile, plan: result.plan, startedOn: result.startedOn || old.startedOn }));
+      setAccount((old) => old.user.id === account.user.id ? { ...old, profile: result.profile, plan: result.plan, startedOn: result.startedOn || old.startedOn } : old);
       return result.profile;
     },
     approvePlan: async (ticket) => {
       if (!token) throw new Error('Sign in again to continue.');
       const result = await request<{ plan: AiPlan }>('/plan/approve', 'POST', token, { ticket });
-      setAccount((old) => ({ ...old, plan: result.plan }));
+      setAccount((old) => old.user.id === account.user.id ? { ...old, plan: result.plan } : old);
     },
     signOut: async () => {
       if (token) await request('/auth/logout', 'POST', token).catch(() => {});
@@ -143,13 +130,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refreshReviews: async () => {
       if (!token) throw new Error('Sign in again to continue.');
       const result = await request<{ reviews: Review[] }>('/reviews', 'GET', token);
-      setReviews(result.reviews);
+      if (activeUserId.current === account.user.id) setReviews(result.reviews);
       return result.reviews;
     },
     generateReview: async (job) => {
       if (!token) throw new Error('Sign in again to continue.');
       const result = await request<{ review: Review }>('/reviews', 'POST', token, job);
-      setReviews((old) => old.some((item) => item.kind === result.review.kind && item.startDay === result.review.startDay) ? old : [result.review, ...old].sort((a, b) => b.endDay.localeCompare(a.endDay)));
+      if (activeUserId.current === account.user.id) setReviews((old) => old.some((item) => item.kind === result.review.kind && item.startDay === result.review.startDay) ? old : [result.review, ...old].sort((a, b) => b.endDay.localeCompare(a.endDay)));
       return result.review;
     },
   }), [account, ready, token, reviews]);

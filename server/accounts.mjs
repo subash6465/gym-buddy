@@ -1,5 +1,6 @@
 import { validateNutritionProfile } from '../shared/nutrition-profile.mjs';
 import { randomBytes, scryptSync, createHash, timingSafeEqual, createCipheriv, createDecipheriv } from 'node:crypto';
+import { Buffer } from 'node:buffer';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -105,7 +106,7 @@ export function register(emailInput, password, provider, apiKey) {
 export function login(emailInput, password, provider, apiKey) {
   const email = typeof emailInput === 'string' ? emailInput.trim().toLowerCase() : '';
   const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
-  if (!user || typeof password !== 'string') fail('Incorrect email or password.', 401);
+  if (!user || typeof password !== 'string' || password.length < 10 || password.length > 128) fail('Incorrect email or password.', 401);
   const supplied = scryptSync(password, user.salt, 64);
   if (!timingSafeEqual(supplied, Buffer.from(user.password_hash, 'hex'))) fail('Incorrect email or password.', 401);
   if (provider || apiKey) saveAiForUser(user.id, validatedAi(provider, apiKey));

@@ -44,3 +44,7 @@ export function calendarDays(year: number, month: number) {
     return { date: localDay(date), day: date.getDate(), inMonth: date.getMonth() === month };
   });
 }
+
+export function clockTime(date = new Date()) {
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}

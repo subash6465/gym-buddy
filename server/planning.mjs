@@ -37,8 +37,8 @@ export function normalizePlan(raw, profile) {
   const days = dayNames.map((name) => {
     const day = suppliedDays.get(name);
     if (!day || typeof day.title !== 'string' || typeof day.focus !== 'string' || !Array.isArray(day.activities) ||
-        day.activities.some((item) => typeof item !== 'string') || !Number.isFinite(day.minutes)) fail();
-    const isRest = Boolean(day.isRest) || trainingDays >= recommendedDays;
+        day.activities.some((item) => typeof item !== 'string') || !Number.isFinite(day.minutes) || typeof day.isRest !== 'boolean') fail();
+    const isRest = day.isRest || trainingDays >= recommendedDays;
     if (!isRest) trainingDays++;
     return { day: name, title: day.title.trim().slice(0, 80) || (isRest ? 'Recovery' : 'Training'),
       focus: day.focus.trim().slice(0, 180), activities: isRest ? day.activities.slice(0, 4).map((x) => x.slice(0, 120)) : day.activities.slice(0, 8).map((x) => x.slice(0, 120)),

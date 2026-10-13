@@ -4,7 +4,7 @@ An Expo and React Native prototype for tracking meals, workouts, water, weight, 
 
 ## Preview
 
-1. Install Node.js 22.13 or newer and run `npm install`.
+1. Install Node.js 22.13 or newer (Node.js 24 is used in CI) and run `npm ci`.
 2. Run `npm run api` to start the account and meal-estimate server.
 3. Run `npm start` (or `npm run web` for a browser preview).
 4. Scan the Expo QR code with Expo Go on a phone to test the native app and camera.
@@ -41,7 +41,19 @@ Protein starts at 0.8–1.6 g/kg depending on activity and goal. Water shows an 
 
 ## Data and checks
 
-Logs are stored on the device with AsyncStorage, scoped by account. Profile details are stored on the account server and cached on the device. Meal photos are used only for the current estimate and are not saved with the meal. Run `npm test`, `npx expo lint`, and `npx tsc --noEmit` for checks.
+Logs are stored on the device with AsyncStorage, scoped by account. Profile details are stored on the account server and cached on the device. Meal photos are used only for the current estimate and are not saved with the meal. If saved activity cannot be read, the app offers a retry and preserves the original cache. Write failures show a retry button while the in-memory activity is retained.
+
+Run `npm run check` for lint (zero warnings), typecheck, and tests. Run `npm run export` to check web, Android, and iOS bundling, and `npx expo-doctor` for SDK/config checks. CI runs these checks on pushes and pull requests. HTTP tests use an in-memory database and mocked AI providers; they never use your saved accounts or paid provider keys.
+
+## API configuration and deployment
+
+Copy `.env.example` to an ignored `.env` for server settings. Set `EXPO_PUBLIC_API_URL` in `.env.local` for local Expo previews or in the build environment for installable apps. Values embedded in an Expo build require a rebuild when changed. Only the API address is public; encryption secrets and provider keys belong on the API server.
+
+Set `CORS_ORIGINS` to a comma-separated list of exact web origins (for example, `https://gym.example.com`) when hosting the web app separately from the API. Localhost preview origins remain allowed. Native clients do not need CORS. The API bounds JSON requests in bytes, rejects malformed JSON with a 400 response, and hides unexpected internal errors.
+
+Account creation, sign-in, and key verification share a limit of 60 requests per connection address in 10 minutes. AI operations share a limit of 30 requests per authenticated session per minute. These limits are process-local; use shared gateway limits for multiple instances. Forwarded IP headers are deliberately not trusted, so requests behind a reverse proxy share its address for account limits. Configure gateway limits before exposing a public deployment.
+
+See [the cleanup audit](docs/codebase-audit.md) for completed improvements, remaining production work, and the limits of local verification.
 
 ## Android and iOS builds
 

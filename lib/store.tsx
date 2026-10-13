@@ -2,7 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { withSavedMeal } from './meals';
 import { useAuth } from './auth';
-import { localDay } from './dates';
+import { localDay, clockTime } from './dates';
+import { restoreData } from './persistence';
 import type { HealthCondition, ClinicianTargets } from '@/shared/nutrition-profile.mjs';
 
 export type Goal = 'lose' | 'gain' | 'maintain';
@@ -24,9 +25,13 @@ export type Profile = {
   fitnessPlan: string; weightKg: number;
   daysPerWeek: number; pace: 'light' | 'moderate' | 'aggressive';
 };
-type Data = { profile: Profile; historyStartDay: string; meals: Meal[]; workouts: Workout[]; weighIns: WeighIn[]; water: Record<string, number>; waterEntries: WaterEntry[]; stepEntries: StepEntry[] };
+export type Data = { profile: Profile; historyStartDay: string; meals: Meal[]; workouts: Workout[]; weighIns: WeighIn[]; water: Record<string, number>; waterEntries: WaterEntry[]; stepEntries: StepEntry[] };
 type Store = Data & {
   ready: boolean;
+  storageError: string;
+  storageSaveError: string;
+  retryLoad: () => void;
+  retrySave: () => void;
   completeOnboarding: (ticket: string) => Promise<void>;
   replaceProfile: (profile: Profile) => void;
   addMeal: (meal: Omit<Meal, 'id'>) => void;
@@ -59,42 +64,56 @@ const initial: Data = {
 const Context = createContext<Store | null>(null);
 export const today = localDay;
 const newId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-const clockTime = () => { const date = new Date(); return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`; };
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const auth = useAuth();
   const [data, setData] = useState<Data>(initial);
   const [ready, setReady] = useState(false);
   const [loadedUserId, setLoadedUserId] = useState('');
+  const [storageError, setStorageError] = useState('');
+  const [storageSaveError, setStorageSaveError] = useState('');
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [saveAttempt, setSaveAttempt] = useState(0);
+  const currentUserId = useRef(auth.user.id);
+  currentUserId.current = auth.user.id;
   const writes = useRef<Promise<unknown>>(Promise.resolve());
   const deleting = useRef(false);
   const key = `gym-buddy-data-v2-${auth.user.id}`;
   useEffect(() => {
     if (!auth.ready) return;
     let active = true;
+    setData(initial);
+    setStorageError('');
+    setStorageSaveError('');
     if (!auth.user.id) { setData(initial); setLoadedUserId(''); setReady(true); deleting.current = false; return; }
     setReady(false);
-    AsyncStorage.getItem(key).then((raw) => {
+    writes.current.catch(() => {}).then(() => AsyncStorage.getItem(key)).then((raw) => {
       if (!active) return;
-      let saved: Partial<Data> = {};
-      if (raw) {
-        saved = JSON.parse(raw) as Partial<Data>;
-      }
-      setData({ ...initial, ...saved, historyStartDay: raw ? saved.historyStartDay || auth.startedOn || today() : today(), profile: { ...initial.profile, ...saved.profile, ...auth.profile },
-        meals: (saved.meals || []).map((meal) => ({ ...meal, type: meal.type || 'snack', time: meal.time || '12:00' })),
-        weighIns: saved.weighIns?.length ? [...saved.weighIns].sort((a, b) => b.date.localeCompare(a.date)) : auth.profile?.weightKg ? [{ id: newId(), date: auth.startedOn || today(), kg: auth.profile.weightKg }] : [], });
-    }).catch(() => {}).finally(() => { if (active) { setLoadedUserId(auth.user.id); setReady(true); } });
+      const restored = restoreData(raw, initial, auth.profile);
+      restored.historyStartDay = raw ? restored.historyStartDay || auth.startedOn || today() : today();
+      restored.weighIns = restored.weighIns.length ? [...restored.weighIns].sort((a, b) => b.date.localeCompare(a.date)) : auth.profile?.weightKg ? [{ id: newId(), date: auth.startedOn || today(), kg: auth.profile.weightKg }] : [];
+      setData(restored);
+      setLoadedUserId(auth.user.id);
+      setReady(true);
+    }).catch(() => { if (active) setStorageError('Could not read your saved activity. Try again. Your saved data has been kept.'); });
     return () => { active = false; };
-  }, [auth.ready, auth.user.id]);
+  }, [auth.ready, auth.user.id, loadAttempt]);
   useEffect(() => { if (ready && auth.user.id && loadedUserId === auth.user.id && !deleting.current) {
     const snapshot = JSON.stringify(data);
-    writes.current = writes.current.catch(() => {}).then(() => deleting.current ? undefined : AsyncStorage.setItem(key, snapshot));
-  } }, [data, ready, key, auth.user.id, loadedUserId]);
+    let active = true;
+    writes.current = writes.current.catch(() => {}).then(() => deleting.current ? undefined : AsyncStorage.setItem(key, snapshot))
+      .then(() => { if (active) setStorageSaveError(''); })
+      .catch(() => { if (active) setStorageSaveError('Activity could not be saved on this device. Keep the app open and try saving again.'); });
+    return () => { active = false; };
+  } }, [data, ready, key, auth.user.id, loadedUserId, saveAttempt]);
   const effectiveReady = ready && auth.user.id === loadedUserId;
   const value = useMemo<Store>(() => ({
-    ...data, ready: effectiveReady,
+    ...data, ready: effectiveReady, storageError, storageSaveError,
+    retryLoad: () => setLoadAttempt((attempt) => attempt + 1),
+    retrySave: () => setSaveAttempt((attempt) => attempt + 1),
     completeOnboarding: async (ticket) => {
       const profile = await auth.approveAccountPlan(ticket, true);
+      if (currentUserId.current !== auth.user.id) return;
       setData((old) => ({ ...old, profile, historyStartDay: today(), weighIns: [{ id: newId(), date: today(), kg: profile.weightKg }, ...old.weighIns] }));
     },
     replaceProfile: (profile) => setData((old) => ({ ...old, profile })),
@@ -133,7 +152,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     removeWeighIn: (id) => setData((old) => ({ ...old, weighIns: old.weighIns.filter((item) => item.id !== id) })),
     removeWater: (id) => setData((old) => { const entry = old.waterEntries.find((item) => item.id === id); return entry ? { ...old, waterEntries: old.waterEntries.filter((item) => item.id !== id), water: { ...old.water, [entry.date]: Math.max(0, (old.water[entry.date] || 0) - entry.ml) } } : old; }),
     removeSteps: (id) => setData((old) => ({ ...old, stepEntries: old.stepEntries.filter((item) => item.id !== id) })),
-  }), [data, effectiveReady, auth]);
+  }), [data, effectiveReady, auth, storageError, storageSaveError]);
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 

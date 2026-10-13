@@ -35,3 +35,9 @@ test('clinical profiles cannot fall back to a legacy automated plan', () => {
   assert.equal(planTargets(profile, 80, clinical).protein, 45);
   assert.equal(suggestedTargets({ ...profile, healthConditions: [], heightCm: 'invalid' }, 80), null);
 });
+
+test('invalid measurements never create NaN or infinite targets', () => {
+  const profile = { dob: '1996-01-01', heightCm: '175', equation: 'male', activity: 'moderate', goal: 'maintain', nutritionCaution: false };
+  for (const heightCm of ['invalid', 'Infinity', '']) assert.equal(suggestedTargets({ ...profile, heightCm }, 80), null);
+  for (const kg of [NaN, Infinity, 0, 24, 401]) assert.equal(suggestedTargets(profile, kg), null);
+});

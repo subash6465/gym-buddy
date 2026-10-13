@@ -11,10 +11,9 @@ import type { MealEstimate } from '@/lib/mealEstimate';
 import { useAuth } from '@/lib/auth';
 import { Meal, today, useStore } from '@/lib/store';
 import { theme } from '@/lib/theme';
-import { parseDay, formatDate } from '@/lib/dates';
+import { clockTime, parseDay, formatDate } from '@/lib/dates';
 
 type Mode = 'meal' | 'workout' | 'weight' | 'water' | 'steps';
-const clockTime = () => { const date = new Date(); return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`; };
 
 export default function Log() {
   const store = useStore();
@@ -47,18 +46,24 @@ export default function Log() {
   const existing = mealType !== 'snack' ? store.meals.find((meal) => meal.date === date && meal.type === mealType) : null;
 
   async function pickPhoto(camera: boolean) {
-    if (camera) {
-      const permission = await ImagePicker.requestCameraPermissionsAsync();
-      if (!permission.granted) { Alert.alert('Camera permission needed', 'Allow camera access to photograph a meal.'); return; }
-    }
-    const result = camera ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: .6, base64: true }) : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: .6, base64: true });
-    if (!result.canceled) {
-      const asset = result.assets[0];
-      setPhoto(asset.uri); setPhotoData(asset.base64 ? `data:${asset.mimeType || 'image/jpeg'};base64,${asset.base64}` : null);
-      setEstimate(null); setError(asset.base64 ? '' : 'The photo could not be read. Try another image.');
+    if (estimating) return;
+    try {
+      if (camera) {
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) { Alert.alert('Camera permission needed', 'Allow camera access to photograph a meal.'); return; }
+      }
+      const result = camera ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: .6, base64: true }) : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: .6, base64: true });
+      if (!result.canceled) {
+        const asset = result.assets[0];
+        setPhoto(asset.uri); setPhotoData(asset.base64 ? `data:${asset.mimeType || 'image/jpeg'};base64,${asset.base64}` : null);
+        setEstimate(null); setError(asset.base64 ? '' : 'The photo could not be read. Try another image.');
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not open the photo picker. Try again.');
     }
   }
   async function analyze() {
+    if (estimating) return;
     if (!description.trim() && !photoData) return setError('Describe the food or add a photo first.');
     setEstimating(true); setError(''); setEstimate(null);
     try { setEstimate(await auth.estimateMeal(description.trim(), photoData)); }
@@ -75,7 +80,7 @@ export default function Log() {
     setSuccess(''); setError('');
     if (mode === 'weight') {
       const kg = Number(weight);
-      if (!Number.isFinite(kg) || kg <= 0 || kg > 500) return setError('Enter a valid weight in kilograms (up to 500 kg).');
+      if (!Number.isFinite(kg) || kg < 25 || kg > 400) return setError('Enter a weight between 25 and 400 kilograms.');
       store.addWeighIn(date, kg); setWeight(''); setSuccess(`Weigh-in saved · ${formatDate(date)}`); return;
     }
     if (mode === 'water') {
@@ -121,9 +126,9 @@ export default function Log() {
         {existing && <Text style={{ color: theme.nutrition, fontSize: 12 }}>Saving another {mealType} for {formatDate(date)} will replace the current entry. Snacks can be added more than once.</Text>}
         <Label>TIME</Label><MealTimePicker value={mealTime} onChange={setMealTime} />
         <Label>FOOD AND PORTION</Label>
-        <Input value={description} onChangeText={(value) => { setDescription(value); setEstimate(null); }} multiline placeholder="e.g. 2 chapatis (80 g), dal (150 g), paneer (100 g), oil (1 tsp)" style={{ minHeight: 94, textAlignVertical: 'top' }} />
+        <Input editable={!estimating} maxLength={3000} value={description} onChangeText={(value) => { setDescription(value); setEstimate(null); }} multiline placeholder="e.g. 2 chapatis (80 g), dal (150 g), paneer (100 g), oil (1 tsp)" style={{ minHeight: 94, textAlignVertical: 'top' }} />
         <Text style={[ui.muted, { fontSize: 11 }]}>For a more accurate estimate, list each food with its weight in grams, plus oils, sauces, and drinks. If you do not know the weight, give the portion size.</Text>
-        <Row><View style={{ flex: 1 }}><Button secondary onPress={() => pickPhoto(true)}>Take photo</Button></View><View style={{ flex: 1 }}><Button secondary onPress={() => pickPhoto(false)}>Choose photo</Button></View></Row>
+        <Row><View style={{ flex: 1 }}><Button secondary disabled={estimating} onPress={() => pickPhoto(true)}>Take photo</Button></View><View style={{ flex: 1 }}><Button secondary disabled={estimating} onPress={() => pickPhoto(false)}>Choose photo</Button></View></Row>
         {photo && <Image source={{ uri: photo }} style={{ width: '100%', height: 170, borderRadius: 13 }} />}
         <Row><Icon name="camera" color={theme.accent} size={17} /><Text style={[ui.muted, { flex: 1, fontSize: 11 }]}>Photo is optional. Only the submitted photo and description go to the AI service.</Text></Row>
       </Card>
