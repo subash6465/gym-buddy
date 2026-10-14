@@ -1,3 +1,5 @@
+> Standalone app: model policies and workflows are bundled into the APK. Keys are supplied by the user and stored in SecureStore; AI requests go directly to the provider. Server environment overrides described below apply only to the retained legacy server. Change the bundled policy and rebuild to alter mobile defaults.
+
 # AI model routing
 
 Verified against provider documentation on 14 October 2026. This implements stronger plans, photos, and summaries with economical routine chat and text meals. Pricing and provider access can change; actual fitness/nutrition quality requires evaluation with representative prompts and labeled photos.

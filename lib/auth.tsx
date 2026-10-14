@@ -5,8 +5,8 @@ import { Platform } from 'react-native';
 import type { Profile } from './store';
 import type { MealEstimate } from './mealEstimate';
 import type { AiPlan } from './plan';
-import { apiUrl } from './apiUrl';
-import { apiRequest } from './request';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createDeviceRuntime } from '../shared/device-runtime.mjs';
 import { localDay } from './dates';
 import type { Review, ReviewJob } from './reviews';
 
@@ -17,8 +17,10 @@ export type AccountPlanPreview = { profile: Profile; plan: AiPlan; ticket: strin
 type Account = { user: { id: string; email: string }; profile: Profile | null; startedOn: string | null; ai: { provider: AiProvider | null; configured: boolean }; plan: AiPlan | null };
 type Auth = Account & {
   ready: boolean;
+  setupError: string;
+  retrySetup: () => void;
   verifyAiKey: (provider: AiProvider, apiKey: string) => Promise<string>;
-  signIn: (email: string, password: string, create: boolean, provider: AiProvider, apiKey: string, verificationTicket: string) => Promise<void>;
+  connectAi: (provider: AiProvider, apiKey: string, verificationTicket: string) => Promise<void>;
   saveAiConfig: (provider: AiProvider, apiKey: string, verificationTicket: string) => Promise<void>;
   identifyExercise: (description: string, exercises: CatalogExercise[]) => Promise<ExerciseIdentity>;
   estimateMeal: (description: string, imageDataUrl: string | null) => Promise<MealEstimate>;
@@ -33,18 +35,26 @@ type Auth = Account & {
   generateReview: (job: ReviewJob) => Promise<Review>;
 };
 const Context = createContext<Auth | null>(null);
-const sessionKey = 'gym-buddy-session';
-
-const readToken = () => Platform.OS === 'web'
-  ? Promise.resolve(typeof window === 'undefined' ? null : window.localStorage.getItem(sessionKey))
-  : SecureStore.getItemAsync(sessionKey);
-const writeToken = (token: string | null) => Platform.OS === 'web'
-  ? Promise.resolve().then(() => { if (token) window.localStorage.setItem(sessionKey, token); else window.localStorage.removeItem(sessionKey); })
-  : token ? SecureStore.setItemAsync(sessionKey, token) : SecureStore.deleteItemAsync(sessionKey);
-
+// Provider credentials never enter AsyncStorage. Browser previews keep the key
+// in memory; Android/iOS use the platform's encrypted credential store.
+const dataKey = 'gym-buddy-device-account-v1';
+const credentialKey = 'gym-buddy-device-ai-v1';
+let browserKey: string | null = null;
+let sequence = 0;
+const runtime = createDeviceRuntime({
+  readData: () => AsyncStorage.getItem(dataKey),
+  writeData: (value) => AsyncStorage.setItem(dataKey, value),
+  removeData: () => AsyncStorage.removeItem(dataKey),
+  readKey: () => Platform.OS === 'web' ? Promise.resolve(browserKey) : SecureStore.getItemAsync(credentialKey),
+  writeKey: async (value) => {
+    if (Platform.OS === 'web') { browserKey = value; return; }
+    if (value) await SecureStore.setItemAsync(credentialKey, value);
+    else await SecureStore.deleteItemAsync(credentialKey);
+  },
+  newId: () => `${Date.now()}-${++sequence}-${Math.random().toString(36).slice(2)}`,
+});
 async function request<T>(path: string, method: string, token?: string, body?: object): Promise<T> {
-  const timeoutMs = ['/chat', '/identify-exercise', '/estimate-meal', '/verify-ai-key', '/onboarding/preview', '/profile/preview', '/reviews'].includes(path) && method !== 'GET' ? 90_000 : 8000;
-  return apiRequest<T>({ baseUrl: apiUrl(), path, method, token, body, timeoutMs });
+  return await runtime.request(path, method, token, body) as T;
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -53,31 +63,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [token, setToken] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [setupError, setSetupError] = useState('');
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const activeUserId = useRef(account.user.id);
   activeUserId.current = account.user.id;
   useEffect(() => {
     let active = true;
-    readToken().then(async (saved) => {
+    setReady(false); setSetupError('');
+    runtime.initialize().then(async (saved) => {
       if (!saved) return;
-      try {
-        const result = await request<Account>('/account', 'GET', saved);
-        if (active) { setToken(saved); setAccount(result); }
-      } catch (error) {
-        // Keep the token through network outages; only a rejected session is cleared.
-        if (error instanceof Error && 'status' in error && error.status === 401) await writeToken(null);
-      }
-    }).catch(() => {}).finally(() => { if (active) setReady(true); });
+      const result = await request<Account>('/account', 'GET', saved);
+      if (active) { setToken(saved); setAccount(result); }
+    }).catch((error) => {
+      if (active) setSetupError(error instanceof Error ? error.message : 'Could not read device setup. Your data has been kept.');
+    }).finally(() => { if (active) setReady(true); });
     return () => { active = false; };
-  }, []);
-  const value = useMemo<Auth>(() => ({ ...account, ready,
+  }, [loadAttempt]);
+  const value = useMemo<Auth>(() => ({ ...account, ready, setupError, retrySetup: () => setLoadAttempt((attempt) => attempt + 1),
     verifyAiKey: async (provider, apiKey) => {
       const result = await request<{ verified: boolean; ticket: string }>('/verify-ai-key', 'POST', undefined, { provider, apiKey });
       if (!result.verified || !result.ticket) throw new Error('The provider did not verify the key.');
       return result.ticket;
     },
-    signIn: async (email, password, create, provider, apiKey, verificationTicket) => {
-      const result = await request<Account & { token: string }>(create ? '/auth/register' : '/auth/login', 'POST', undefined, { email, password, provider, apiKey, verificationTicket });
-      await writeToken(result.token);
+    connectAi: async (provider, apiKey, verificationTicket) => {
+      const result = await request<Account & { token: string }>('/auth/register', 'POST', undefined, { provider, apiKey, verificationTicket });
       setToken(result.token);
       setAccount({ user: result.user, profile: result.profile, startedOn: result.startedOn, ai: result.ai, plan: result.plan });
       setReviews([]);
@@ -111,22 +120,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setAccount((old) => old.user.id === account.user.id ? { ...old, plan: result.plan } : old);
     },
     signOut: async () => {
-      if (token) await request('/auth/logout', 'POST', token).catch(() => {});
-      await writeToken(null);
+      if (token) await request('/auth/logout', 'POST', token);
       setToken(null);
       setAccount(emptyAccount);
       setReviews([]);
     },
     deleteAccount: async (clearLocalData) => {
       if (!token) throw new Error('Sign in again to continue.');
-      await request('/account', 'DELETE', token);
-      try { await clearLocalData(); }
-      finally {
-        await writeToken(null).catch(() => {});
-        setToken(null);
-        setAccount(emptyAccount);
-        setReviews([]);
-      }
+      await request('/account', 'DELETE', token, { clearLocalData });
+      setToken(null);
+      setAccount(emptyAccount);
+      setReviews([]);
     },
     chat: async (messages, context, weightKg) => {
       if (!token) throw new Error('Sign in again to continue.');
@@ -145,7 +149,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (activeUserId.current === account.user.id) setReviews((old) => old.some((item) => item.kind === result.review.kind && item.startDay === result.review.startDay) ? old : [result.review, ...old].sort((a, b) => b.endDay.localeCompare(a.endDay)));
       return result.review;
     },
-  }), [account, ready, token, reviews]);
+  }), [account, ready, token, reviews, setupError]);
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 

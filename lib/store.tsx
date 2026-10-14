@@ -86,6 +86,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (!auth.ready) return;
     let active = true;
     setData(initial);
+    deleting.current = false;
     setStorageError('');
     setStorageSaveError('');
     if (!auth.user.id) { setData(initial); setLoadedUserId(''); setReady(true); deleting.current = false; return; }
@@ -148,7 +149,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     clearAccountData: async () => {
       deleting.current = true;
       await writes.current.catch(() => {});
-      await AsyncStorage.removeItem(key);
+      try { await AsyncStorage.removeItem(key); }
+      catch (error) { deleting.current = false; throw error; }
       setData(initial);
     },
     removeMeal: (id) => setData((old) => ({ ...old, meals: old.meals.filter((item) => item.id !== id) })),

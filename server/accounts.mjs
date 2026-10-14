@@ -1,9 +1,11 @@
-import { validateNutritionProfile } from '../shared/nutrition-profile.mjs';
+import { validateProfile } from '../shared/ai/profile.mjs';
 import { randomBytes, scryptSync, createHash, timingSafeEqual, createCipheriv, createDecipheriv } from 'node:crypto';
 import { Buffer } from 'node:buffer';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+
+export { validateProfile };
 
 const path = process.env.DATABASE_PATH === ':memory:' ? ':memory:' : resolve(process.env.DATABASE_PATH || 'server/data/gym-buddy.sqlite');
 if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
@@ -140,29 +142,6 @@ export function saveAiConfig(authorization, provider, apiKey) {
   return { ai: publicAi(user.id) };
 }
 
-const choices = {
-  goal: ['lose', 'gain', 'maintain'], setting: ['gym', 'home'],
-  activity: ['sedentary', 'light', 'moderate', 'high'], equation: ['', 'female', 'male'],
-};
-export function validateProfile(profile) {
-  if (!profile || typeof profile !== 'object' || Array.isArray(profile)) fail('Invalid profile.');
-  Object.assign(profile, validateNutritionProfile(profile));
-  profile.daysPerWeek ??= 3;
-  profile.pace ??= 'moderate';
-  for (const field of ['name', 'dob', 'heightCm', 'allergies', 'concerns', 'fitnessPlan']) {
-    if (typeof profile[field] !== 'string' || profile[field].length > 2000) fail(`Invalid ${field}.`);
-  }
-  if (!profile.name.trim()) fail('Enter your name.');
-  const date = /^(\d{4})-(\d{2})-(\d{2})$/.exec(profile.dob);
-  const birth = date && new Date(Number(date[1]), Number(date[2]) - 1, Number(date[3]));
-  if (!birth || birth.getFullYear() !== Number(date[1]) || birth.getMonth() !== Number(date[2]) - 1 || birth.getDate() !== Number(date[3]) || birth > new Date()) fail('Enter a valid date of birth.');
-  if (!Number.isFinite(Number(profile.heightCm)) || Number(profile.heightCm) < 100 || Number(profile.heightCm) > 250) fail('Enter a height between 100 and 250 cm.');
-  if (!Number.isFinite(profile.weightKg) || profile.weightKg < 25 || profile.weightKg > 400) fail('Enter a weight between 25 and 400 kg.');
-  for (const [field, allowed] of Object.entries(choices)) if (!allowed.includes(profile[field])) fail(`Invalid ${field}.`);
-  if (typeof profile.nutritionCaution !== 'boolean') fail('Invalid special dietary care selection.');
-  if (!Number.isInteger(profile.daysPerWeek) || profile.daysPerWeek < 1 || profile.daysPerWeek > 7) fail('Choose 1 to 7 training days per week.');
-  if (!['light', 'moderate', 'aggressive'].includes(profile.pace)) fail('Choose a training pace.');
-}
 export function saveProfile(authorization, profile) {
   const user = currentUser(authorization);
   validateProfile(profile);

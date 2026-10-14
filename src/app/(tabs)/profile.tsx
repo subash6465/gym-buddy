@@ -44,6 +44,15 @@ export default function ProfileScreen() {
   const [aiTicket, setAiTicket] = useState('');
   const [aiVerifiedKey, setAiVerifiedKey] = useState('');
   const [aiMessage, setAiMessage] = useState('');
+  const [disconnectError, setDisconnectError] = useState('');
+  const [disconnecting, setDisconnecting] = useState(false);
+  const disconnectAi = async () => {
+    if (disconnecting || deletingAccount || aiBusy) return;
+    setDisconnecting(true); setDisconnectError('');
+    try { await auth.signOut(); }
+    catch (error) { setDisconnectError(error instanceof Error ? error.message : 'Could not remove the saved key. Try again.'); }
+    finally { setDisconnecting(false); }
+  };
   const verifyAi = async () => {
     if (aiVerifying) return;
     setAiMessage(''); setAiTicket(''); setAiVerifying(true);
@@ -62,13 +71,13 @@ export default function ProfileScreen() {
     if (deletingAccount) return;
     setDeletingAccount(true); setDeleteError('');
     try { await auth.deleteAccount(store.clearAccountData); }
-    catch (error) { setDeleteError(error instanceof Error ? error.message : 'Could not delete your account.'); }
+    catch (error) { store.retryLoad(); setDeleteError(error instanceof Error ? error.message : 'Could not delete your device data.'); }
     finally { setDeletingAccount(false); }
   };
   const confirmDelete = () => {
-    const message = 'Are you sure you want to delete your account? Your login, profile, and all logged data will be permanently deleted. This cannot be reversed.';
+    const message = 'Delete your data on this device? Your profile, AI key, and all logged data will be permanently deleted. This cannot be reversed.';
     if (Platform.OS === 'web') { if (window.confirm(message)) void deleteAccount(); }
-    else Alert.alert('Delete account?', message, [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete account', style: 'destructive', onPress: () => { void deleteAccount(); } }]);
+    else Alert.alert('Delete device data?', message, [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete data', style: 'destructive', onPress: () => { void deleteAccount(); } }]);
   };
   const startEdit = () => {
     const proceed = () => { setPreview(null); setDraft({ ...profile }); setDraftWeight(String(store.weighIns[0]?.kg || profile.weightKg)); setProfileError(''); setReviewing(false); setEditing(true); };
@@ -145,18 +154,19 @@ export default function ProfileScreen() {
       {targets ? <><Text style={{ color: theme.text, fontSize: 27, fontFamily: theme.font }}>{targets.calories} kcal</Text><Text style={{ color: theme.text, fontSize: 18, fontWeight: '700' }}>{targets.protein > 0 ? `${targets.protein} g protein` : 'Protein guide needed'} / {targets.water > 0 ? `${targets.water} ml drinks` : 'Drink guide needed'}</Text><MacroBreakdown amounts={macroTotals(store.meals.filter((meal) => meal.date === today(now)))} targets={targets} />{targets.maintenance > 0 ? <Text style={ui.muted}>Estimated maintenance: {targets.maintenance} kcal. Goal adjustment: {profile.goal === 'lose' ? 'about −300 kcal' : profile.goal === 'gain' ? 'about +200 kcal' : 'none'}. Protein guide: {targets.proteinFactor} g/kg.</Text> : <Text style={ui.muted}>Clinician-provided guides entered by you.</Text>}<Text style={ui.muted}>Water is a starting drinks target; food also supplies water. Heat, exercise, illness and medical conditions can change your needs. These are estimates, not prescriptions.</Text></> : <><MacroBreakdown amounts={macroTotals(store.meals.filter((meal) => meal.date === today(now)))} targets={targets} /><Text style={ui.muted}>Enter a valid birth date (age 20+), height, current weight, and equation reference to see estimates. Automatic targets are paused when special dietary care is selected or when weight loss is selected at a low BMI. Add clinician-provided values in Personal details & goals.</Text></>}
     </Disclosure>
     <Disclosure title="AI coach settings" subtitle={`Connected to ${auth.ai.provider?.toUpperCase() || 'your provider'}`}>
-      <Text style={ui.muted}>Current: {auth.ai.configured ? auth.ai.provider?.toUpperCase() : 'Not configured'}. A new key replaces the saved key for this account.</Text>
+      <Text style={ui.muted}>Current: {auth.ai.configured ? auth.ai.provider?.toUpperCase() : 'Not configured'}. A new key replaces the saved key on this device.</Text>
       <View style={{ flexDirection: 'row', gap: 8 }}>{([['openai', 'OpenAI'], ['claude', 'Claude'], ['gemini', 'Gemini']] as const).map(([value, label]) => <Pressable key={value} disabled={aiVerifying} onPress={() => { setAiProvider(value); setAiKey(''); setAiTicket(''); }} accessibilityRole="button" accessibilityState={{ selected: aiProvider === value }} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 42, borderRadius: 12, backgroundColor: aiProvider === value ? theme.accent : theme.cardAlt }}><Text style={{ color: aiProvider === value ? theme.ink : theme.text, fontFamily: theme.font }}>{label}</Text></Pressable>)}</View>
       <Label>NEW API KEY</Label><Input value={aiKey} editable={!aiVerifying} onChangeText={(value) => { setAiKey(value); setAiTicket(''); }} secureTextEntry autoCapitalize="none" autoCorrect={false} placeholder="Paste a new API key" />
       <Pressable onPress={() => { void verifyAi(); }} disabled={aiVerifying || aiBusy || aiKey.trim().length < 10} accessibilityRole="button" style={{ minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.cardAlt }}><View style={{ flexDirection: 'row', gap: 8 }}>{aiVerifying ? <ActivityIndicator color={theme.accent} /> : null}<Text style={{ color: theme.accent, fontFamily: theme.font }}>{aiVerifying ? 'Verifying…' : aiTicket ? 'Verified ✓' : 'Verify API key'}</Text></View></Pressable>
       {aiMessage ? <Text accessibilityRole="alert" style={{ color: aiMessage === 'AI provider saved.' ? theme.accent : theme.red }}>{aiMessage}</Text> : null}
       <Button disabled={aiBusy || aiVerifying || !aiTicket} onPress={() => { void saveAi(); }}>{aiBusy ? 'Saving…' : 'Save AI provider'}</Button>
     </Disclosure>
-    <Button secondary onPress={() => auth.signOut()}>Sign out</Button>
-    <Disclosure title="Delete account" subtitle="Permanently remove your account and data">
-      <Text style={ui.muted}>Permanently removes your login, profile, and activity saved on this device.</Text>
+    <Button secondary disabled={disconnecting || deletingAccount || aiBusy} onPress={() => { void disconnectAi(); }}>{disconnecting ? 'Disconnecting...' : 'Disconnect AI key'}</Button>
+    {disconnectError ? <Text accessibilityRole="alert" style={{ color: theme.red }}>{disconnectError}</Text> : null}
+    <Disclosure title="Delete device data" subtitle="Permanently remove data from this device">
+      <Text style={ui.muted}>Permanently removes your AI key, profile, plans, reviews, and activity saved on this device.</Text>
       {deleteError ? <Text accessibilityRole="alert" style={{ color: theme.red }}>{deleteError}</Text> : null}
-      <Button secondary disabled={deletingAccount} onPress={confirmDelete}>{deletingAccount ? 'Deleting account…' : 'Delete my account'}</Button>
+      <Button secondary disabled={deletingAccount} onPress={confirmDelete}>{deletingAccount ? 'Deleting data…' : 'Delete device data'}</Button>
     </Disclosure>
   </Page>;
 }
