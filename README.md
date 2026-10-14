@@ -21,7 +21,26 @@ The app asks AI to estimate nutrition from one meal description and an optional 
 
 Run `npm run api` in a second terminal. Enter your chosen provider's key during sign in or account creation. The same provider is used for chat and for text or photo meal estimates. You can replace the provider and key on the You tab. Keys are sent to the Gym Buddy API over the configured connection, encrypted at rest by the API, and never returned to the app. The local API creates a separate ignored encryption key file beside the database unless `AI_KEY_ENCRYPTION_SECRET` is set. Keep that file or environment secret when backing up the database; losing it makes saved AI keys unreadable. Use HTTPS when connecting to an API outside a trusted local network.
 
-OpenAI and Claude default to `gpt-4o-mini` and `claude-haiku-5-5`, configurable with `OPENAI_MODEL` and `CLAUDE_MODEL`. For a Gemini API key, verification uses `gemma-4-26b-a4b-it`, initial and revised plans use `gemini-3.8-flash`, coach chat uses `gemini-3.1-flash-lite`, text or photo meal estimates use `gemini-3.5-flash-lite`, and progress reviews use `gemini-3.8-flash`. Override these with `GEMINI_VERIFICATION_MODEL`, `GEMINI_PLANNING_MODEL`, `GEMINI_CHAT_MODEL`, `GEMINI_MEAL_MODEL`, and `GEMINI_REVIEW_MODEL` on the API server. The former `GEMINI_MODEL` setting remains a fallback for planning if `GEMINI_PLANNING_MODEL` is unset. The API sends meal descriptions and photos to the chosen provider. Chat also sends recent conversation messages and the app context displayed in chat.
+The API uses economical models for routine coach chat and text meals, and stronger models for plans, photo meals, and progress reviews:
+
+| Task | OpenAI | Claude | Gemini |
+| --- | --- | --- | --- |
+| Key verification | `gpt-6-luna` | `claude-haiku-5-5` | `gemma-4-26b-a4b-it` |
+| Initial/revised profile and plan | `gpt-6.1-sol` | `claude-sonnet-5-5` | `gemini-3.8-flash` |
+| Coach chat | `gpt-6-luna` | `claude-haiku-5-5` | `gemini-3.1-flash-lite` |
+| Text meal estimate | `gpt-6-luna` | `claude-haiku-5-5` | `gemini-3.5-flash-lite` |
+| Meal estimate with a photo | `gpt-6.1-sol` | `claude-sonnet-5-5` | `gemini-3.8-flash` |
+| Weekly/monthly reviews | `gpt-6.1-sol` | `claude-sonnet-5-5` | `gemini-3.8-flash` |
+
+Set server-side overrides with `<PROVIDER>_<TASK>_MODEL`, where providers are `OPENAI`, `CLAUDE`, or `GEMINI`, and tasks are `VERIFICATION`, `PLANNING`, `CHAT`, `MEAL`, `PHOTO`, or `REVIEW`. See `.env.example`. Photo meals resolve `PHOTO_MODEL` independently of `MEAL_MODEL`; adding or removing the photo automatically switches the model. Chat-requested plan revisions first use the chat model to detect the action, then the planning model to generate the approval preview. Approving previews and fetching saved reviews do not call AI again.
+
+Existing `OPENAI_MODEL` and `CLAUDE_MODEL` settings remain all-task fallbacks, below task-specific overrides. **Remove old global settings to adopt the balanced defaults**; otherwise an old deployment can still send every task to its global model. `GEMINI_MODEL` remains a planning-only fallback. Restart the API after changing settings; no mobile app rebuild is needed for model changes. Only the user's selected provider and its verified key are used; there is no automatic switching to another provider's credentials.
+
+OpenAI uses no reasoning for Luna routine tasks, medium effort for planning, and low effort for other stronger tasks. Claude uses low effort for routine tasks and medium effort for stronger tasks. Effort parameters are added only for known compatible models, so legacy/custom overrides do not receive unsupported settings. Task-specific output limits include reasoning where the provider counts it; partial output and refusals return recoverable errors rather than invalid JSON. OpenAI photo requests use high detail to retain food/portion information. Retries are bounded to three attempts and the original deadline, respect `Retry-After`, and skip rejected keys, invalid requests, and recognizable permanent quota errors. Claude overloads (`529`) are retryable. Gemini's existing schema fallback remains within that same deadline and preserves its output limit.
+
+Set `AI_USAGE_LOGGING=true` to log provider, model, task, and actual token/cache counters on the API server, including reasoning in output usage. Logs omit prompts, images, replies, account identifiers, and API keys. OpenAI input counts include cache hits; Claude's `inputTokens` excludes separately reported cache reads/writes. Metrics are not stored in the account database. The API sends meal descriptions and photos to the chosen provider. Chat also sends recent conversation messages and app context.
+
+See [model selection and validation notes](docs/ai-model-routing.md) for the pricing comparison, output budgets, and test scope.
 
 Onboarding sends the entered profile to the selected provider to generate a weekly plan. The server validates the day structure and bounds the returned numbers; a light, moderate, or aggressive pace changes the permitted calorie range, while recovery is still required. For users under 20, users needing special dietary care, those skipping the metabolic equation, or weight loss at a low BMI, the app pauses personal calorie and drink targets. These are starting estimates, not measured deficits or medical prescriptions. In chat, requests to revise a plan or review nutrition create an approval preview; approval saves the exact validated proposal without a second AI call.
 
