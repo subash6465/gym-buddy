@@ -1,3 +1,4 @@
+import { planDayLabel } from '@/lib/workouts';
 import NutritionGuideList from '@/components/NutritionGuideList';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
@@ -71,7 +72,7 @@ export default function Chat() {
         mealTypes: [...new Set(meals.map((x) => x.type))] },
       todaysMeals: meals.map((x) => ({ name: x.name, type: x.type, time: x.time, calories: x.calories, protein: x.protein })),
       todaysWorkoutTotals: { count: workouts.length, minutes: workouts.reduce((sum, x) => sum + x.minutes, 0) },
-      todaysWorkouts: workouts.map((x) => ({ name: x.name, minutes: x.minutes })),
+      todaysWorkouts: workouts.map((x) => ({ name: x.name, minutes: x.minutes, exercises: x.exercises })),
       waterMl: store.water[date] || 0, steps: store.stepEntries.filter((x) => x.date === date).reduce((sum, x) => sum + x.count, 0),
       calorieGuide: targets?.calories, proteinGuide: targets?.protein, stepsGuide: auth.plan?.stepsTarget,
       weeklyPlan: auth.plan?.days.map((day) => ({ day: day.day, title: day.title, activities: day.activities })) });
@@ -125,12 +126,12 @@ export default function Chat() {
             <NutritionGuideList nutrition={message.planProposal.plan.nutrition} previous={message.planProposal.prior?.nutrition} />
             <Text style={{ color: theme.text, fontWeight: '700' }}>Current week</Text>
             <Text style={{ color: theme.muted }}>{message.planProposal.prior?.summary || 'No saved plan'}</Text>
-            {message.planProposal.prior ? <Text style={{ color: theme.muted, fontSize: 12 }}>{message.planProposal.prior.days.map((day) => `${day.day.slice(0, 3)}: ${day.title}`).join(' · ')}</Text> : null}
+            {message.planProposal.prior ? <Text style={{ color: theme.muted, fontSize: 12 }}>{message.planProposal.prior.days.map((day, index) => `${planDayLabel(message.planProposal!.prior!.days, index)}: ${day.title}`).join(' · ')}</Text> : null}
             <Text style={{ color: theme.text, fontWeight: '700' }}>Proposed week</Text>
             <Text style={{ color: theme.text }}>{message.planProposal.plan.summary}</Text>
             <Text style={{ color: theme.muted, fontSize: 12 }}>Daily goals: {message.planProposal.prior?.calorieTarget || 'Not set'} → {message.planProposal.plan.calorieTarget || 'Needs clinician input'} kcal · {message.planProposal.prior?.proteinGrams || 'Not set'} → {message.planProposal.plan.proteinGrams || 'Needs clinician input'} g protein · {message.planProposal.prior?.stepsTarget || 0} → {message.planProposal.plan.stepsTarget} steps</Text>
             <Text style={{ color: theme.muted, fontSize: 12 }}>Drinks guide: {message.planProposal.plan.waterMl ? `${message.planProposal.plan.waterMl} ml / ${message.planProposal.plan.nutrition?.waterSource === 'clinician' ? 'Clinician-supplied' : 'Starting estimate'}` : 'Needs clinician input'}</Text>
-            {message.planProposal.plan.days.map((day) => <View key={day.day} style={{ borderTopWidth: 1, borderColor: theme.line, paddingTop: 6 }}><Text style={{ color: theme.text, fontWeight: '700' }}>{day.day}: {day.title}</Text><Text style={{ color: theme.muted, fontSize: 12 }}>{day.focus} · {day.activities.join(', ')}</Text></View>)}
+            {message.planProposal.plan.days.map((day, index) => <View key={day.day} style={{ borderTopWidth: 1, borderColor: theme.line, paddingTop: 6 }}><Text style={{ color: theme.text, fontWeight: '700' }}>{planDayLabel(message.planProposal!.plan.days, index)}: {day.title}</Text><Text style={{ color: theme.muted, fontSize: 12 }}>{day.focus} · {day.activities.join(', ')}</Text></View>)}
             {message.planProposal.status === 'pending' ? <View style={{ flexDirection: 'row', gap: 8 }}>
               <Pressable accessibilityRole="button" disabled={busy || revising} onPress={() => { void decidePlan(index, true); }} style={{ backgroundColor: theme.accent, padding: 10, borderRadius: 10, opacity: busy || revising ? .5 : 1 }}><Text style={{ color: theme.ink, fontFamily: theme.font }}>{revising ? 'Saving…' : 'Approve'}</Text></Pressable>
               <Pressable accessibilityRole="button" disabled={busy || revising} onPress={() => { void decidePlan(index, false); }} style={{ backgroundColor: theme.card, padding: 10, borderRadius: 10, opacity: busy || revising ? .5 : 1 }}><Text style={{ color: theme.text, fontFamily: theme.font }}>Reject</Text></Pressable>

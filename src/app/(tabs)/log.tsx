@@ -1,3 +1,4 @@
+import WorkoutLogger from '@/components/WorkoutLogger';
 import MacroBreakdown from '@/components/MacroBreakdown';
 import { planTargets } from '@/lib/targets';
 import * as ImagePicker from 'expo-image-picker';
@@ -18,7 +19,7 @@ type Mode = 'meal' | 'workout' | 'weight' | 'water' | 'steps';
 export default function Log() {
   const store = useStore();
   const auth = useAuth();
-  const params = useLocalSearchParams<{ date?: string; mode?: string; entry?: string }>();
+  const params = useLocalSearchParams<{ date?: string; mode?: string; entry?: string; day?: string }>();
   const entryContext = `${params.entry || ''}:${params.date || ''}:${params.mode || ''}`;
   const [dateOverride, setDateOverride] = useState<{ param?: string; date: string } | null>(null);
   const routedDate = typeof params.date === 'string' && parseDay(params.date) && params.date <= today() ? params.date : today();
@@ -33,15 +34,13 @@ export default function Log() {
   const [description, setDescription] = useState('');
   const [mealType, setMealType] = useState<Meal['type']>('breakfast');
   const [mealTime, setMealTime] = useState(clockTime());
-  const [workoutTime, setWorkoutTime] = useState(clockTime());
   const [estimate, setEstimate] = useState<MealEstimate | null>(null);
   const [estimating, setEstimating] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState<{ context: string; text: string } | null>(null);
   const success = notice?.context === entryContext ? notice.text : '';
   const setSuccess = (text: string) => setNotice({ context: entryContext, text });
-  const [name, setName] = useState(''); const [note, setNote] = useState('');
-  const [minutes, setMinutes] = useState(''); const [weight, setWeight] = useState(''); const [water, setWater] = useState(''); const [steps, setSteps] = useState('');
+  const [weight, setWeight] = useState(''); const [water, setWater] = useState(''); const [steps, setSteps] = useState('');
   const nutritionTargets = planTargets(store.profile, store.weighIns.find((entry) => entry.date <= date)?.kg, auth.plan, new Date(`${date}T12:00:00`));
   const existing = mealType !== 'snack' ? store.meals.find((meal) => meal.date === date && meal.type === mealType) : null;
 
@@ -93,10 +92,6 @@ export default function Log() {
       if (!Number.isInteger(count) || count <= 0 || count > 100000) return setError('Enter a whole number of steps from 1 to 100,000.');
       store.addSteps(date, count); setSteps(''); setSuccess(`Steps saved · ${formatDate(date)}`); return;
     }
-    const duration = Number(minutes);
-    if (!name.trim() || !Number.isFinite(duration) || duration <= 0 || duration > 1440) return setError('Enter an activity and a positive duration, up to 1,440 minutes.');
-    store.addWorkout({ date, time: workoutTime, name: name.trim(), minutes: duration, note: note.trim() });
-    setName(''); setNote(''); setMinutes(''); setWorkoutTime(clockTime()); setSuccess('Workout saved. Nice work showing up today.');
   }
 
   return <Page>
@@ -112,7 +107,11 @@ export default function Log() {
     {success ? <Card><Row><Icon name="check" color={theme.accent} /><Text accessibilityRole="alert" style={{ color: theme.accent, flex: 1, fontWeight: '700' }}>{success}</Text></Row></Card> : null}
     {mode !== 'meal' && error ? <Card><Text accessibilityRole="alert" style={{ color: theme.red }}>{error}</Text></Card> : null}
     <Disclosure title={date === today() ? 'Logging for today' : `Logging for ${formatDate(date)}`} subtitle="Tap to change date or fill a past gap"><DaySelector value={date} onChange={setDate} /><Text style={ui.muted}>Edit existing entries in Progress / Daily history.</Text></Disclosure>
-    {mode === 'meal' ? <Reveal key="meal" style={{ gap: 18 }}>
+    <View style={{ gap: 18 }}>
+    <View style={{ display: mode === 'workout' ? 'flex' : 'none' }}>
+      <WorkoutLogger key={`${entryContext}:${params.day || ''}`} date={date} selectedDay={params.day} onSaved={setSuccess} />
+    </View>
+    {mode === 'workout' ? null : mode === 'meal' ? <Reveal key="meal" style={{ gap: 18 }}>
       <Card>
         <Text style={{ color: theme.text, fontSize: 19, fontFamily: theme.font }}>What did you eat?</Text>
         <Label>MEAL</Label>
@@ -133,7 +132,7 @@ export default function Log() {
         <Row><Icon name="camera" color={theme.accent} size={17} /><Text style={[ui.muted, { flex: 1, fontSize: 11 }]}>Photo is optional. Only the submitted photo and description go to the AI service.</Text></Row>
       </Card>
       <Button onPress={analyze} disabled={estimating}>{estimating ? 'Estimating…' : estimate ? 'Estimate again' : 'Estimate nutrition with AI'}</Button>
-      {error ? <Reveal><Card><Text style={{ color: theme.red }}>{error}</Text></Card></Reveal> : null}
+      {error ? <Reveal><Card><Text accessibilityRole="alert" style={{ color: theme.red }}>{error}</Text></Card></Reveal> : null}
       {estimate && <Reveal><Card style={{ backgroundColor: theme.hero, borderColor: 'rgba(252,163,17,0.3)' }}>
         <Row><Icon name="sparkles" color={theme.accent} size={19} /><Text style={{ color: theme.accent, fontFamily: theme.font, fontSize: 10, letterSpacing: 1 }}>AI ESTIMATE · REVIEW BEFORE SAVING</Text></Row>
         <Text style={{ color: theme.text, fontSize: 20, fontFamily: theme.font }}>{estimate.name}</Text>
@@ -147,9 +146,9 @@ export default function Log() {
       <Text style={{ color: theme.text, fontSize: 19, fontFamily: theme.font }}>{mode === 'weight' ? 'Weight check-in' : mode === 'water' ? 'Hydration check-in' : mode === 'steps' ? 'Steps check-in' : 'Workout details'}</Text>
       {mode === 'weight' ? <><Label>WEIGHT (KG)</Label><Input value={weight} onChangeText={setWeight} keyboardType="decimal-pad" placeholder="e.g. 72.5" /></> :
         mode === 'water' ? <><Label>AMOUNT (ML)</Label><Input value={water} onChangeText={setWater} keyboardType="number-pad" placeholder="e.g. 250" /></> :
-        mode === 'steps' ? <><Label>STEPS</Label><Input value={steps} onChangeText={setSteps} keyboardType="number-pad" placeholder="e.g. 3200" /></> :
-          <><Label>ACTIVITY</Label><Input value={name} onChangeText={setName} placeholder="e.g. strength training" /><Label>EXERCISES OR NOTES</Label><Input value={note} onChangeText={setNote} multiline placeholder="e.g. squats, rows and presses" style={{ minHeight: 78, textAlignVertical: 'top' }} /><Label>START TIME</Label><MealTimePicker value={workoutTime} onChange={setWorkoutTime} /><Label>DURATION (MINUTES)</Label><Input value={minutes} onChangeText={setMinutes} keyboardType="number-pad" placeholder="e.g. 45" /></>}
+        <><Label>STEPS</Label><Input value={steps} onChangeText={setSteps} keyboardType="number-pad" placeholder="e.g. 3200" /></>}
       <Button onPress={saveOther}>Save {mode}</Button>
     </Card></Reveal>}
+    </View>
   </Page>;
 }

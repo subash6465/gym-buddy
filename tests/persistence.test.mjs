@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { restoreData } from '../lib/persistence.ts';
 
-const initial = { historyStartDay: '', profile: { name: '' }, meals: [], workouts: [], weighIns: [], water: {}, waterEntries: [], stepEntries: [] };
+const initial = { exerciseLibrary: [], historyStartDay: '', profile: { name: '' }, meals: [], workouts: [], weighIns: [], water: {}, waterEntries: [], stepEntries: [] };
 test('account restoration starts empty and keeps legacy meal defaults', () => {
   assert.deepEqual(restoreData(null, initial, { name: 'Second account' }), { ...initial, profile: { name: 'Second account' } });
   const legacyMeal = { id: 'meal', date: '2026-01-01', name: 'Lunch', note: '', calories: 100, protein: 1, carbs: 1, fat: 1, fibre: 1, sugar: 1 };

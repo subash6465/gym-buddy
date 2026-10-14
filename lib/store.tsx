@@ -1,3 +1,5 @@
+import { normalizeCatalog, type CatalogExercise } from '../shared/exercise-catalog.mjs';
+import type { LoggedExercise } from './workouts';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { withSavedMeal } from './meals';
@@ -12,7 +14,7 @@ export type Meal = {
   calories: number; protein: number; carbs: number; fat: number; fibre: number; sugar: number;
   addedSugar?: number | null; saturatedFat?: number | null;
 };
-export type Workout = { id: string; date: string; time?: string; name: string; minutes: number; note: string };
+export type Workout = { id: string; date: string; time?: string; name: string; minutes: number; note: string; planDay?: string; planLabel?: string; exercises?: LoggedExercise[] };
 export type WeighIn = { id: string; date: string; kg: number };
 export type WaterEntry = { id: string; date: string; time: string; ml: number };
 export type StepEntry = { id: string; date: string; time: string; count: number };
@@ -25,8 +27,9 @@ export type Profile = {
   fitnessPlan: string; weightKg: number;
   daysPerWeek: number; pace: 'light' | 'moderate' | 'aggressive';
 };
-export type Data = { profile: Profile; historyStartDay: string; meals: Meal[]; workouts: Workout[]; weighIns: WeighIn[]; water: Record<string, number>; waterEntries: WaterEntry[]; stepEntries: StepEntry[] };
+export type Data = { profile: Profile; historyStartDay: string; exerciseLibrary: CatalogExercise[]; meals: Meal[]; workouts: Workout[]; weighIns: WeighIn[]; water: Record<string, number>; waterEntries: WaterEntry[]; stepEntries: StepEntry[] };
 type Store = Data & {
+  rememberExercise: (exercise: CatalogExercise) => void;
   ready: boolean;
   storageError: string;
   storageSaveError: string;
@@ -58,7 +61,7 @@ type Store = Data & {
 
 const initial: Data = {
   profile: { name: '', goal: 'maintain', setting: 'gym', dob: '', heightCm: '', equation: '', activity: 'light', nutritionCaution: false, healthConditions: [], clinicianTargets: {}, allergies: '', concerns: '', fitnessPlan: '', weightKg: 0, daysPerWeek: 3, pace: 'moderate' },
-  historyStartDay: '',
+  historyStartDay: '', exerciseLibrary: [],
   meals: [], workouts: [], weighIns: [], water: {}, waterEntries: [], stepEntries: [],
 };
 const Context = createContext<Store | null>(null);
@@ -116,6 +119,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (currentUserId.current !== auth.user.id) return;
       setData((old) => ({ ...old, profile, historyStartDay: today(), weighIns: [{ id: newId(), date: today(), kg: profile.weightKg }, ...old.weighIns] }));
     },
+    rememberExercise: (exercise) => setData((old) => ({ ...old, exerciseLibrary: normalizeCatalog([...(old.exerciseLibrary || []), exercise]) })),
     replaceProfile: (profile) => setData((old) => ({ ...old, profile })),
     addMeal: (meal) => setData((old) => ({ ...old, meals: withSavedMeal(old.meals, { ...meal, id: newId() }) })),
     editMeal: (meal) => setData((old) => ({ ...old, meals: withSavedMeal(old.meals.filter((item) => item.id !== meal.id), meal) })),

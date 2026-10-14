@@ -1,3 +1,4 @@
+import { workoutDetails } from '@/lib/workouts';
 import MacroBreakdown from '@/components/MacroBreakdown';
 import { macroTotals } from '@/lib/macros';
 import NutritionDetails from '@/components/NutritionDetails';
@@ -48,7 +49,7 @@ function HistoryContent({ initialDate, initialView }: { initialDate: string; ini
   const targets = planTargets(store.profile, weight, auth.plan, new Date(`${selected}T12:00:00`));
   const events: Event[] = ([
     ...meals.map((x) => ({ id: x.id, time: x.time, kind: x.type.toUpperCase(), entryKind: 'meal' as const, title: x.name, meal: x, detail: `${number(x.calories)} kcal${x.note ? `\n${x.note}` : ''}` })),
-    ...workouts.map((x) => ({ id: x.id, time: x.time, kind: 'WORKOUT', entryKind: 'workout' as const, title: x.name, detail: `${number(x.minutes)} min${x.note ? ` · ${x.note}` : ''}` })),
+    ...workouts.map((x) => ({ id: x.id, time: x.time, kind: 'WORKOUT', entryKind: 'workout' as const, title: x.name, detail: `${x.planLabel ? `${x.planLabel} · ` : ''}${number(x.minutes)} min${x.note ? ` · ${x.note}` : ''}${x.exercises?.length ? `\n${workoutDetails(x.exercises)}` : ''}` })),
     ...waters.map((x) => ({ id: x.id, time: x.time, kind: 'WATER', entryKind: 'water' as const, title: `${number(x.ml)} ml water`, detail: 'Drink logged' })),
     ...steps.map((x) => ({ id: x.id, time: x.time, kind: 'STEPS', entryKind: 'steps' as const, title: `${number(x.count)} steps`, detail: 'Steps logged' })),
     ...weighIns.map((x) => ({ id: x.id, kind: 'WEIGH-IN', entryKind: 'weight' as const, title: `${x.kg} kg`, detail: 'Weight recorded; time was not saved' })),

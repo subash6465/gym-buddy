@@ -34,6 +34,24 @@ test('day names are sorted and malformed schedules are rejected', () => {
   assert.throws(() => normalizePlan({ ...raw, days: raw.days.slice(1) }, profile), { status: 502 });
 });
 
+test('structured exercises survive plan normalization and invalid prescriptions are rejected', () => {
+  const exercises = [{ name: 'Bench press', prescription: '3 × 8–12', kind: 'strength', sets: 3 }];
+  const structured = { ...raw, days: raw.days.map((day) => ({ ...day, exercises })) };
+  assert.deepEqual(normalizePlan(structured, profile).days[0].exercises, exercises);
+  for (const invalid of [{ ...exercises[0], sets: 0 }, { ...exercises[0], sets: 31 }, { ...exercises[0], kind: 'unknown' }, { ...exercises[0], name: '' }]) {
+    assert.throws(() => normalizePlan({ ...raw, days: raw.days.map((day) => ({ ...day, exercises: [invalid] })) }, profile), { status: 502 });
+  }
+});
+
+test('plans use one Walking, Running and Cycling entry per session and canonical names across days', () => {
+  const exercises = ['Cooldown walk', 'Treadmill walking', 'Post-workout walk', 'Running in street', 'Treadmill running', 'Bicycling', 'Stationary bike'].map((name) => ({ name, kind: 'timed', sets: 1, prescription: '5 minutes' }));
+  const plan = normalizePlan({ ...raw, days: raw.days.map((day) => ({ ...day, exercises })) }, profile);
+  assert.deepEqual(plan.days[0].exercises.map((exercise) => exercise.name), ['Walking', 'Running', 'Cycling']);
+  assert.equal(plan.days[0].activities.length, 3);
+  assert.equal(plan.days[1].exercises[0].name, 'Walking');
+  assert.deepEqual(plan.days.at(-1).exercises, []);
+});
+
 test('plan generation sends all relevant onboarding choices to the selected provider', async () => {
   const original = globalThis.fetch;
   let request;
@@ -51,6 +69,9 @@ test('plan generation sends all relevant onboarding choices to the selected prov
     assert.equal(sent.profile.allergies, input.allergies);
     assert.equal(sent.profile.concerns, input.concerns);
     assert.equal(plan.days.length, 7);
+    assert.match(request.instructions, /Speed is available only for Walking and Cycling/);
+    assert.match(request.instructions, /Incline is available only for Walking/);
+    assert.match(request.instructions, /Measurements are independently optional/);
   } finally { globalThis.fetch = original; }
 });
 

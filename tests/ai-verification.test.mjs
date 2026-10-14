@@ -20,7 +20,7 @@ test('provider errors do not issue verification tickets', async () => {
   finally { globalThis.fetch = original; }
 });
 
-test('Gemini key verification calls Gemma 4 26B', async () => {
+test('Gemini key verification calls Gemini 3.5 Flash Lite', async () => {
   const original = globalThis.fetch;
   let url;
   globalThis.fetch = async (requestUrl) => {
@@ -29,7 +29,7 @@ test('Gemini key verification calls Gemma 4 26B', async () => {
   };
   try {
     const { ticket } = await verifyAiKey('gemini', 'sample-private-key');
-    assert.match(url, /models\/gemma-4-26b-a4b-it:generateContent$/);
+    assert.match(url, /models\/gemini-3\.5-flash-lite:generateContent$/);
     assert.doesNotThrow(() => requireVerifiedKey('gemini', 'sample-private-key', ticket));
   } finally { globalThis.fetch = original; }
 });

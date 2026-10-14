@@ -5,7 +5,7 @@ An Expo and React Native prototype for tracking meals, workouts, water, weight, 
 ## Preview
 
 1. Install Node.js 22.13 or newer (Node.js 24 is used in CI) and run `npm ci`.
-2. Run `npm run api` to start the account and meal-estimate server.
+2. Run `npm run api` to start the API server. It automatically restarts when server or shared source files change.
 3. Run `npm start` (or `npm run web` for a browser preview).
 4. Scan the Expo QR code with Expo Go on a phone to test the native app and camera.
 
@@ -19,20 +19,22 @@ The app needs the API server to create an account, sign in, and save profile cha
 
 The app asks AI to estimate nutrition from one meal description and an optional photo. The user reviews the approximate values and assumptions before saving. Breakfast, lunch, and dinner each have one entry per day; saving another replaces that meal. Snacks can be logged repeatedly. Meal time is recorded.
 
+Photo analysis first checks for identifiable food or a drink. A no-meal result returns a clear message and cannot be saved as a meal; the model must not invent food from a description when the photo is unrelated. For valid meals, the prompt asks for each visible food's estimated cooked/served weight, visible fruits/vegetables, likely preparation, retained oil/fats, and home/restaurant context where supported. The user's quantities add context and foods are counted only once across photo and description. The reviewable breakdown is returned in assumptions and saved with the meal alongside combined nutrition totals. Hidden ingredients, oil and serving sizes remain estimates, and appearance alone does not establish home/restaurant origin.
+
 Run `npm run api` in a second terminal. Enter your chosen provider's key during sign in or account creation. The same provider is used for chat and for text or photo meal estimates. You can replace the provider and key on the You tab. Keys are sent to the Gym Buddy API over the configured connection, encrypted at rest by the API, and never returned to the app. The local API creates a separate ignored encryption key file beside the database unless `AI_KEY_ENCRYPTION_SECRET` is set. Keep that file or environment secret when backing up the database; losing it makes saved AI keys unreadable. Use HTTPS when connecting to an API outside a trusted local network.
 
-The API uses economical models for routine coach chat and text meals, and stronger models for plans, photo meals, and progress reviews:
+The API selects models by task. Gemini uses Flash Lite for key verification and text/photo meals, and Flash for plans and progress reviews:
 
 | Task | OpenAI | Claude | Gemini |
 | --- | --- | --- | --- |
-| Key verification | `gpt-6-luna` | `claude-haiku-5-5` | `gemma-4-26b-a4b-it` |
+| Key verification | `gpt-6-luna` | `claude-haiku-5-5` | `gemini-3.5-flash-lite` |
 | Initial/revised profile and plan | `gpt-6.1-sol` | `claude-sonnet-5-5` | `gemini-3.8-flash` |
 | Coach chat | `gpt-6-luna` | `claude-haiku-5-5` | `gemini-3.1-flash-lite` |
 | Text meal estimate | `gpt-6-luna` | `claude-haiku-5-5` | `gemini-3.5-flash-lite` |
-| Meal estimate with a photo | `gpt-6.1-sol` | `claude-sonnet-5-5` | `gemini-3.8-flash` |
+| Meal estimate with a photo | `gpt-6.1-sol` | `claude-sonnet-5-5` | `gemini-3.5-flash-lite` |
 | Weekly/monthly reviews | `gpt-6.1-sol` | `claude-sonnet-5-5` | `gemini-3.8-flash` |
 
-Set server-side overrides with `<PROVIDER>_<TASK>_MODEL`, where providers are `OPENAI`, `CLAUDE`, or `GEMINI`, and tasks are `VERIFICATION`, `PLANNING`, `CHAT`, `MEAL`, `PHOTO`, or `REVIEW`. See `.env.example`. Photo meals resolve `PHOTO_MODEL` independently of `MEAL_MODEL`; adding or removing the photo automatically switches the model. Chat-requested plan revisions first use the chat model to detect the action, then the planning model to generate the approval preview. Approving previews and fetching saved reviews do not call AI again.
+Set server-side overrides with `<PROVIDER>_<TASK>_MODEL`, where providers are `OPENAI`, `CLAUDE`, or `GEMINI`, and tasks are `VERIFICATION`, `PLANNING`, `CHAT`, `MEAL`, `PHOTO`, or `REVIEW`. See `.env.example`. Photo meals resolve `PHOTO_MODEL` independently of `MEAL_MODEL`; these default to the same model for Gemini and can be overridden separately. Chat-requested plan revisions first use the chat model to detect the action, then the planning model to generate the approval preview. Approving previews and fetching saved reviews do not call AI again.
 
 Existing `OPENAI_MODEL` and `CLAUDE_MODEL` settings remain all-task fallbacks, below task-specific overrides. **Remove old global settings to adopt the balanced defaults**; otherwise an old deployment can still send every task to its global model. `GEMINI_MODEL` remains a planning-only fallback. Restart the API after changing settings; no mobile app rebuild is needed for model changes. Only the user's selected provider and its verified key are used; there is no automatic switching to another provider's credentials.
 
@@ -51,6 +53,14 @@ Weekly reviews cover consecutive 7-day periods from setup; monthly reviews cover
 The browser preview calls `http://localhost:8787` by default. Expo Go in LAN mode uses the Metro computer's address for the API. For a tunnel connection or a separately hosted API, set `EXPO_PUBLIC_API_URL` in an ignored `.env.local` file for Expo, then restart the app.
 
 AI nutrition figures are estimates. Photos cannot reveal exact portions, cooking oil, or hidden allergens. The app keeps the user's description and the model's assumptions with each saved meal.
+
+## Plan-based workout logging
+
+Training sessions are labeled Day 1, Day 2, and so on, excluding recovery days. Select any session in Log → Workout, or use **Log this session** from the Plan tab. New plans supply structured exercises; existing text-based plans also load without regeneration.
+
+Choose the details you have for each exercise: reps, weight, time, speed or incline. Selecting reps includes sets. Weight is optional, including for squats and timed holds. Time can be entered in seconds or minutes; switching units preserves the duration. Walking supports time, speed in km/h and incline in degrees. Cycling supports time and speed; running records time. Speed is offered only for walking and cycling, and incline only for walking. When Weight is selected, check **Individual weights in each hand** to enter separate Left hand and Right hand kg values for every set. Leave it unchecked for one shared total load (including a barbell) or selected machine stack weight. The hand values are stored and displayed separately in history and editing; the app never guesses or doubles them. Add or remove sets or intervals, add extra exercises, or skip an exercise for this session. Skipped exercises are excluded from the saved workout and can be restored before saving. Switching training days asks before clearing entered exercise values; switching log categories keeps the current workout draft while the screen remains mounted.
+
+**Change exercise** and **Add an exercise** open a searchable dropdown of exercises from every plan day, remembered choices and prior workouts. Selecting a listed exercise does not call AI. **Not present in the dropdown** enables a description and calls the authenticated `/identify-exercise` endpoint using the account's configured AI provider and text-meal model policy. The full exercise list accompanies the description so AI can reuse an existing exercise. Review the suggested name before applying it; confirmed new exercises join the account's device-local library for future selection. Ambiguous descriptions show a possible match and missing details. Walking, treadmill walking and cooldown/post-workout walks share one Walking entry; running variants share Running and cycling/bicycling variants share Cycling. The same rules are included in plan generation and enforced when plans are normalized. The performed name, original exercise, description and selected measurements are saved together on the device, visible in Daily history, and editable there. Keep the API server updated alongside the app for exercise identification.
 
 ## Suggested targets
 

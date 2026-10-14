@@ -1,1 +1,1 @@
-export type MealEstimate = { name: string; calories: number; protein: number; carbs: number; fat: number; fibre: number; sugar: number; addedSugar?: number | null; saturatedFat?: number | null; assumptions: string };
+export type MealEstimate = { mealFound?: true; name: string; calories: number; protein: number; carbs: number; fat: number; fibre: number; sugar: number; addedSugar?: number | null; saturatedFat?: number | null; assumptions: string };

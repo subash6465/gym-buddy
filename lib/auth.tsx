@@ -1,3 +1,4 @@
+import type { CatalogExercise, ExerciseIdentity } from './workouts';
 import * as SecureStore from 'expo-secure-store';
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform } from 'react-native';
@@ -19,6 +20,7 @@ type Auth = Account & {
   verifyAiKey: (provider: AiProvider, apiKey: string) => Promise<string>;
   signIn: (email: string, password: string, create: boolean, provider: AiProvider, apiKey: string, verificationTicket: string) => Promise<void>;
   saveAiConfig: (provider: AiProvider, apiKey: string, verificationTicket: string) => Promise<void>;
+  identifyExercise: (description: string, exercises: CatalogExercise[]) => Promise<ExerciseIdentity>;
   estimateMeal: (description: string, imageDataUrl: string | null) => Promise<MealEstimate>;
   previewAccountPlan: (profile: Profile, onboarding: boolean) => Promise<AccountPlanPreview>;
   approveAccountPlan: (ticket: string, onboarding: boolean) => Promise<Profile>;
@@ -41,7 +43,7 @@ const writeToken = (token: string | null) => Platform.OS === 'web'
   : token ? SecureStore.setItemAsync(sessionKey, token) : SecureStore.deleteItemAsync(sessionKey);
 
 async function request<T>(path: string, method: string, token?: string, body?: object): Promise<T> {
-  const timeoutMs = ['/chat', '/estimate-meal', '/verify-ai-key', '/onboarding/preview', '/profile/preview', '/reviews'].includes(path) && method !== 'GET' ? 90_000 : 8000;
+  const timeoutMs = ['/chat', '/identify-exercise', '/estimate-meal', '/verify-ai-key', '/onboarding/preview', '/profile/preview', '/reviews'].includes(path) && method !== 'GET' ? 90_000 : 8000;
   return apiRequest<T>({ baseUrl: apiUrl(), path, method, token, body, timeoutMs });
 }
 
@@ -84,6 +86,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!token) throw new Error('Sign in again to continue.');
       const result = await request<{ ai: Account['ai'] }>('/ai-config', 'PUT', token, { provider, apiKey, verificationTicket });
       setAccount((old) => old.user.id === account.user.id ? { ...old, ai: result.ai } : old);
+    },
+    identifyExercise: async (description, exercises) => {
+      if (!token) throw new Error('Sign in again to continue.');
+      return request<ExerciseIdentity>('/identify-exercise', 'POST', token, { description, exercises });
     },
     estimateMeal: async (description, imageDataUrl) => {
       if (!token) throw new Error('Sign in again to continue.');

@@ -1,10 +1,11 @@
+import WorkoutLogger from '@/components/WorkoutLogger';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Platform, Text, View } from 'react-native';
 import DaySelector from '@/components/DaySelector';
 import MealTimePicker from '@/components/MealTimePicker';
 import { Button, Card, Input, Label, Page, Title, ui } from '@/components/UI';
-import { Meal, StepEntry, WaterEntry, WeighIn, useStore } from '@/lib/store';
+import { Meal, Workout, StepEntry, WaterEntry, WeighIn, useStore } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
 import { localDay, parseDay, formatDate } from '@/lib/dates';
 import { theme } from '@/lib/theme';
@@ -102,6 +103,7 @@ export default function EditEntry() {
     if (Platform.OS === 'web') { if (window.confirm('Delete this entry?')) action(); }
     else Alert.alert('Delete entry?', 'This entry will be removed from your history.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: action }]);
   };
+  if (kind === 'workout' && (entry as Workout | undefined)?.exercises) return <Page><Title eyebrow="CORRECT YOUR RECORD">Edit workout</Title><Label>DATE</Label><DaySelector value={draft.date || entry!.date} onChange={(value) => set('date', value)} /><WorkoutLogger key={entry!.id} date={draft.date || entry!.date} initial={entry as Workout} onSaved={() => goToHistory(draft.date)} /><Button secondary onPress={remove}>Delete entry</Button><Button secondary onPress={() => goToHistory(entry!.date)}>Cancel</Button></Page>;
   return <Page>
     <Title eyebrow="CORRECT YOUR RECORD" subtitle="Changes to past days update your charts and future reviews.">Edit {kind || 'entry'}</Title>
     {!entry ? <Card><Text style={ui.muted}>This entry is no longer available.</Text><Button secondary onPress={() => goToHistory()}>Back</Button></Card> : <Card>

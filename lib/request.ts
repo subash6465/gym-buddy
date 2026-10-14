@@ -24,6 +24,9 @@ export async function apiRequest<T>({ baseUrl, path, method, token, body, timeou
     try { result = JSON.parse(text); }
     catch { throw Object.assign(new Error('The Gym Buddy API returned an invalid response. Try again.'), { status: response.status }); }
     if (!response.ok) {
+      if (response.status === 404 && path === '/identify-exercise') {
+        throw Object.assign(new Error('The Gym Buddy API needs an update for exercise identification. Restart or update the API server, then try again.'), { status: 404 });
+      }
       const message = result && typeof result === 'object' && 'error' in result && typeof result.error === 'string'
         ? result.error : 'Request failed.';
       throw Object.assign(new Error(message), { status: response.status });

@@ -1,5 +1,6 @@
+import type { PlannedExercise } from './workouts';
 export type PlanDay = {
-  day: string; title: string; focus: string; activities: string[]; minutes: number; isRest: boolean;
+  day: string; title: string; focus: string; activities: string[]; exercises?: PlannedExercise[]; minutes: number; isRest: boolean;
 };
 export type AiPlan = {
   nutrition?: NutritionPlan;
