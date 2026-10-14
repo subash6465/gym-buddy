@@ -34,7 +34,7 @@ test('all providers support verification, previews, approvals, meals, chat, revi
     const schema = body.text?.format?.schema || body.output_config?.format?.schema || body.generationConfig?.responseJsonSchema || body.generationConfig?.responseFormat?.text?.schema;
     const result = schema?.properties.days ? { ...plan, summary: revision ? 'Revised strength plan.' : plan.summary }
       : schema?.properties.action ? { reply: 'Review the proposal.', action: { kind: revision ? 'plan' : 'none', mode: 'set', date: '', value: 0 } }
-        : schema?.properties.calories ? { name: 'Dal and rice', calories: 450, protein: 20, carbs: 70, fat: 10, fibre: 8, sugar: 3, addedSugar: null, saturatedFat: null, assumptions: 'Approximate serving.' }
+        : schema?.properties.calories ? { mealFound: true, name: 'Dal and rice', calories: 450, protein: 20, carbs: 70, fat: 10, fibre: 8, sugar: 3, addedSugar: null, saturatedFat: null, assumptions: 'Approximate serving.' }
           : schema?.properties.wins ? { summary: 'Consistent logging.', wins: ['Recorded meals'], improvements: [], nextSteps: ['Keep logging'] } : 'OK';
     calls.push({ provider, model, body });
     const text = typeof result === 'string' ? result : JSON.stringify(result);
@@ -53,7 +53,7 @@ test('all providers support verification, previews, approvals, meals, chat, revi
   for (const provider of Object.keys(models)) {
     const key = { provider, apiKey: 'private-provider-key' };
     const verification = await request('/verify-ai-key', key);
-    assert.equal(calls.at(-1).model, provider === 'gemini' ? 'gemma-4-26b-a4b-it' : models[provider].routine);
+    assert.equal(calls.at(-1).model, provider === 'gemini' ? 'gemini-3.5-flash-lite' : models[provider].routine);
     const account = await request('/auth/register', { email: `${provider}@example.com`, password: 'long-test-password', ...key, verificationTicket: verification.ticket });
     const token = account.token;
     revision = false;
@@ -71,7 +71,7 @@ test('all providers support verification, previews, approvals, meals, chat, revi
     for (const photo of [false, true]) {
       const meal = await request('/estimate-meal', { description: 'Dal and rice', ...(photo ? { imageDataUrl: 'data:image/jpeg;base64,aGVsbG8=' } : {}) }, token);
       assert.equal(meal.addedSugar, null);
-      assert.equal(calls.at(-1).model, photo ? models[provider].strong : provider === 'gemini' ? 'gemini-3.5-flash-lite' : models[provider].routine);
+      assert.equal(calls.at(-1).model, provider === 'gemini' ? 'gemini-3.5-flash-lite' : photo ? models[provider].strong : models[provider].routine);
       if (photo) {
         const body = calls.at(-1).body;
         assert.ok(provider === 'openai' ? body.input[0].content[1].type === 'input_image'

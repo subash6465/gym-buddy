@@ -1,3 +1,5 @@
+import { validLoggedExercise } from '../shared/workout-validation.mjs';
+import { normalizeCatalog } from '../shared/exercise-catalog.mjs';
 import type { Data, Profile } from './store';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -30,6 +32,11 @@ export function restoreData(raw: string | null, initial: Data, profile: Profile 
     throw new Error('Invalid saved water activity.');
   }
   const data = saved as Partial<Data>;
+  if (data.exerciseLibrary !== undefined && (!Array.isArray(data.exerciseLibrary) || data.exerciseLibrary.some((exercise) => !exercise || typeof exercise.name !== 'string' || !exercise.name.trim() || exercise.name.length > 120 || !['strength', 'timed'].includes(exercise.kind)))) throw new Error('Invalid saved exercise library.');
+  if ((data.workouts || []).some((workout) =>
+    (workout.planDay !== undefined && typeof workout.planDay !== 'string') ||
+    (workout.planLabel !== undefined && typeof workout.planLabel !== 'string') ||
+    (workout.exercises !== undefined && (!Array.isArray(workout.exercises) || workout.exercises.length > 20 || workout.exercises.some((exercise) => !validLoggedExercise(exercise)))))) throw new Error('Invalid saved workout exercises.');
   if ((data.meals || []).some((meal) =>
       (meal.type !== undefined && !['', 'breakfast', 'lunch', 'dinner', 'snack'].includes(meal.type)) ||
       (meal.time !== undefined && typeof meal.time !== 'string') ||
@@ -39,6 +46,7 @@ export function restoreData(raw: string | null, initial: Data, profile: Profile 
       }))) throw new Error('Invalid saved meal.');
   return {
     ...initial, ...data,
+    exerciseLibrary: normalizeCatalog(data.exerciseLibrary || []),
     profile: { ...initial.profile, ...data.profile, ...profile },
     meals: (data.meals || []).map((meal) => ({ ...meal, type: meal.type || 'snack', time: meal.time || '12:00' })),
   };

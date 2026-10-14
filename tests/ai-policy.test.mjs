@@ -2,15 +2,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { aiPolicy } from '../server/ai-policy.mjs';
 
-test('balances every provider task and promotes photo meals to the vision model', () => {
+test('routes every provider task and photo meals to their configured models', () => {
   const expected = {
     openai: ['gpt-6-luna', 'gpt-6.1-sol', 'gpt-6-luna', 'gpt-6-luna', 'gpt-6.1-sol'],
     claude: ['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-haiku-5-5', 'claude-sonnet-5-5'],
-    gemini: ['gemma-4-26b-a4b-it', 'gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-3.5-flash-lite', 'gemini-3.8-flash'],
+    gemini: ['gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-3.5-flash-lite', 'gemini-3.8-flash'],
   };
   for (const [provider, models] of Object.entries(expected)) {
     assert.deepEqual(['verification', 'planning', 'chat', 'meal', 'review'].map((task) => aiPolicy(provider, task, false, {}).model), models);
-    assert.equal(aiPolicy(provider, 'meal', true, {}).model, models[1]);
+    assert.equal(aiPolicy(provider, 'meal', true, {}).model, provider === 'gemini' ? 'gemini-3.5-flash-lite' : models[1]);
     assert.equal(aiPolicy(provider, 'meal', true, {}).task, 'photo');
     assert.equal(aiPolicy(provider, 'meal', false, {}).maxOutputTokens, 1200);
     assert.equal(aiPolicy(provider, 'meal', true, {}).maxOutputTokens, 2400);
@@ -31,7 +31,7 @@ test('task settings override legacy globals; blank settings use defaults', () =>
     assert.equal(aiPolicy(provider, 'chat', false, { [`${prefix}_MODEL`]: ' ', [`${prefix}_CHAT_MODEL`]: '' }).model, aiPolicy(provider, 'chat', false, {}).model);
   }
   assert.equal(aiPolicy('gemini', 'planning', false, { GEMINI_MODEL: 'legacy' }).model, 'legacy');
-  assert.equal(aiPolicy('gemini', 'meal', true, { GEMINI_MEAL_MODEL: 'text-only' }).model, 'gemini-3.8-flash');
+  assert.equal(aiPolicy('gemini', 'meal', true, { GEMINI_MEAL_MODEL: 'text-only' }).model, 'gemini-3.5-flash-lite');
   assert.equal(aiPolicy('gemini', 'chat', false, { GEMINI_MODEL: 'legacy' }).model, 'gemini-3.1-flash-lite');
 });
 

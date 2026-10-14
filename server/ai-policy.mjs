@@ -4,8 +4,8 @@ const defaults = {
     photo: 'gpt-6.1-sol', planning: 'gpt-6.1-sol', review: 'gpt-6.1-sol' },
   claude: { verification: 'claude-haiku-5-5', chat: 'claude-haiku-5-5', meal: 'claude-haiku-5-5',
     photo: 'claude-sonnet-5-5', planning: 'claude-sonnet-5-5', review: 'claude-sonnet-5-5' },
-  gemini: { verification: 'gemma-4-26b-a4b-it', chat: 'gemini-3.1-flash-lite', meal: 'gemini-3.5-flash-lite',
-    photo: 'gemini-3.8-flash', planning: 'gemini-3.8-flash', review: 'gemini-3.8-flash' },
+  gemini: { verification: 'gemini-3.5-flash-lite', chat: 'gemini-3.1-flash-lite', meal: 'gemini-3.5-flash-lite',
+    photo: 'gemini-3.5-flash-lite', planning: 'gemini-3.8-flash', review: 'gemini-3.8-flash' },
 };
 // Connection checks still need room for adaptive thinking before the short reply.
 const outputLimits = { verification: 1200, chat: 1600, meal: 1200, photo: 2400, planning: 6000, review: 3000 };

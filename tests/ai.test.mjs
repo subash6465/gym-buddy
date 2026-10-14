@@ -24,7 +24,7 @@ test('routes text and images to the chosen provider without exposing keys in out
     assert.match(calls[1].url, /api\.anthropic\.com/);
     assert.equal(calls[1].options.headers['x-api-key'], 'private-test-key');
     assert.equal(calls[1].body.messages[0].content[1].source.media_type, 'image/png');
-    assert.match(calls[2].url, /models\/gemini-3\.8-flash:generateContent/);
+    assert.match(calls[2].url, /models\/gemini-3\.5-flash-lite:generateContent/);
     assert.equal(calls[2].options.headers['x-goog-api-key'], 'private-test-key');
     assert.equal(calls[2].body.contents[0].parts[1].inlineData.mimeType, 'image/png');
   } finally { globalThis.fetch = original; }
@@ -93,7 +93,7 @@ test('routes each Google task to its configured default model', async () => {
         messages: [{ role: 'user', content: 'Hello' }] });
     }
     assert.deepEqual(urls.map((url) => url.match(/\/models\/([^:]+):generateContent$/)[1]), [
-      'gemma-4-26b-a4b-it', 'gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-3.5-flash-lite',
+      'gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-3.5-flash-lite',
     ]);
   } finally { globalThis.fetch = original; }
 });

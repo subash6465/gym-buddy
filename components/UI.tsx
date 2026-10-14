@@ -1,4 +1,4 @@
-import { Children, createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react';
+import { Children, createContext, isValidElement, ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { useIsFocused } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import {
@@ -61,7 +61,7 @@ export function Page({ children }: { children: ReactNode }) {
           <Reveal delay={0}><Brand /></Reveal>
           {storageSaveError ? <View style={{ gap: 8 }}><Text accessibilityRole="alert" style={{ color: theme.red }}>{storageSaveError}</Text><Button onPress={retrySave}>Try saving again</Button></View> : null}
           {Children.toArray(children).map((child, index) =>
-            <Reveal key={index} delay={Math.min(index * 24, 120)}>{child}</Reveal>)}
+            <Reveal key={isValidElement(child) ? child.key ?? index : index} delay={Math.min(index * 24, 120)}>{child}</Reveal>)}
         </ScrollView>
       </PageFocusContext.Provider>
     </KeyboardAvoidingView>
@@ -90,9 +90,10 @@ export function Reveal({ children, delay = 0, style }: { children: ReactNode; de
   }]}>{children}</Animated.View>;
 }
 
-export function MotionPressable({ children, onPress, style, disabled, accessibilityRole = 'button', accessibilityState }: {
+export function MotionPressable({ children, onPress, style, disabled, accessibilityRole = 'button', accessibilityState, accessibilityLabel }: {
   children: ReactNode; onPress: () => void; style?: StyleProp<ViewStyle>; disabled?: boolean;
   accessibilityRole?: 'button' | 'tab'; accessibilityState?: { selected?: boolean };
+  accessibilityLabel?: string;
 }) {
   const reduced = useReduceMotion();
   const [scale] = useState(() => new Animated.Value(1));
@@ -101,7 +102,7 @@ export function MotionPressable({ children, onPress, style, disabled, accessibil
     Animated.spring(scale, { toValue: value, speed: 28, bounciness: 5, useNativeDriver: true }).start();
   };
   return <Animated.View style={[style, { transform: [{ scale }] }]}>
-    <Pressable accessibilityRole={accessibilityRole} accessibilityState={accessibilityState} disabled={disabled}
+    <Pressable accessibilityRole={accessibilityRole} accessibilityState={{ ...accessibilityState, disabled }} accessibilityLabel={accessibilityLabel} disabled={disabled}
       onPress={onPress} onPressIn={() => springTo(.96)} onPressOut={() => springTo(1)}
       style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>{children}</Pressable>
   </Animated.View>;
